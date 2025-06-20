@@ -22,7 +22,7 @@ public class TaskCommon {
         long currentTimeMillis = System.currentTimeMillis();
         List<String> isEnergyTime = BaseModel.getEnergyTime().getValue();
         Log.runtime("获取能量时间配置:" + isEnergyTime);
-        if (isEnergyTime.contains("-1")) {
+        if (isConfigDisabled(isEnergyTime)) {
             Log.runtime("只收能量时间配置已关闭");
             IS_ENERGY_TIME = false;
         } else {
@@ -31,7 +31,7 @@ public class TaskCommon {
 
         List<String> isModuleSleepTime = BaseModel.getModelSleepTime().getValue();
         Log.runtime("获取模块休眠配置:" + isModuleSleepTime);
-        if (isModuleSleepTime.contains("-1")) {
+        if (isConfigDisabled(isModuleSleepTime)) {
             Log.runtime("休眠配置已关闭");
             IS_MODULE_SLEEP_TIME = false;
         } else {
@@ -39,5 +39,19 @@ public class TaskCommon {
         }
 
         IS_AFTER_8AM = TimeUtil.isAfterOrCompareTimeStr(currentTimeMillis, "0800");
+    }
+
+    /**
+     * 判断当前配置是否表示“关闭”
+     *
+     * @param config 输入的字符串列表
+     * @return true 表示关闭
+     */
+    public static boolean isConfigDisabled(List<String> config) {
+        if (config == null || config.isEmpty()) return true;
+
+        String first = config.get(0).trim();
+
+        return "-1".equals(first);
     }
 }

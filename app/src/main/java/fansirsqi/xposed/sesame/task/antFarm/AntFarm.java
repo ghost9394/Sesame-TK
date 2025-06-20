@@ -1098,14 +1098,10 @@ public class AntFarm extends ModelTask {
             String title = question.getString("title");
 
 
-            if (farmAnswerCache == null) {
-                farmAnswerCache = new HashMap<>();
-            }
-
             String answer = null;
             boolean existsResult = false;
             String cacheKey = title + "|" + today; // 使用 today ，因为答题发生在当天
-            if (farmAnswerCache.containsKey(cacheKey)) {
+            if (farmAnswerCache != null && farmAnswerCache.containsKey(cacheKey)) {
                 answer = farmAnswerCache.get(cacheKey);
                 Log.farm("🎉 答案[" + answer + "]命中缓存题目：" + cacheKey);
                 if (answer != null && labels.toString().contains(answer)) {
@@ -1132,7 +1128,6 @@ public class AntFarm extends ModelTask {
                 updateTomorrowAnswerCache(operationConfigList, tomorrow);
                 Status.setFlagToday(CACHED_FLAG); // 标记为已缓存明日答案
             }
-
         } catch (Exception e) {
             Log.printStackTrace(TAG, "答题出错", e);
         }
@@ -1192,18 +1187,16 @@ public class AntFarm extends ModelTask {
                 if (key.contains("|")) {
                     String[] parts = key.split("\\|", 2);
                     if (parts.length == 2) {
-                        String dateStr = parts[1];//获取日期部分 2025020
+                        String dateStr = parts[1];//获取日期部分 20
                         int dateInt = convertDateToInt(dateStr);
                         if (dateInt == -1) continue;
-                        Log.runtime(TAG, "当前日期：" + todayInt + "缓存日期：" + dateInt + " 题目：" + parts[0]);
+
                         if (todayInt - dateInt <= daysToKeep) {
                             cleanedMap.put(entry.getKey(), entry.getValue());//保存7天内的答案
+                            Log.runtime(TAG, "保留 日期：" + todayInt + "缓存日期：" + dateInt + " 题目：" + parts[0]);
                         }
                     }
                 }
-//                else {
-//                    cleanedMap.put(entry.getKey(), entry.getValue());//保存没有日期的答案
-//                }
             }
             DataCache.INSTANCE.saveData(FARM_ANSWER_CACHE_KEY, cleanedMap);
             Log.runtime(TAG, "cleanOldAnswers 清理缓存完毕");
