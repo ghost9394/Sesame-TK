@@ -114,7 +114,7 @@ public class BaseModel extends Model {
      * 是否记录日志
      */
     @Getter
-    public static final BooleanModelField recordLog = new BooleanModelField("recordLog", "全部 | 记录日志", true);
+    public static final BooleanModelField recordLog = new BooleanModelField("recordLog", "全部 | 记录日志", false);
     /**
      * 是否显示气泡提示
      */
