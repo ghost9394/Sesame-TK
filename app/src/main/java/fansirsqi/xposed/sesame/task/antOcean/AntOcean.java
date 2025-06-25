@@ -65,8 +65,8 @@ public class AntOcean extends ModelTask {
                 }
             }
             // 可选：记录日志或处理未知状态
-            Log.error("ApplyAction", "Unknown applyAction: " + value);
-            return null; // 或者返回一个 UNKNOWN 枚举项
+            //Log.error("ApplyAction", "Unknown applyAction: " + value);
+            //return null; // 或者返回一个 UNKNOWN 枚举项
         }
     }
 
