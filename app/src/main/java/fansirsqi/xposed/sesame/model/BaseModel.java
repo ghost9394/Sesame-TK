@@ -46,7 +46,7 @@ public class BaseModel extends Model {
     @Getter
     public static final ListModelField.ListJoinCommaToStringModelField execAtTimeList =
             new ListModelField.ListJoinCommaToStringModelField("execAtTimeList", "定时执行(关闭:-1)", ListUtil.newArrayList(
-                    "0700", "0730", "1200", "1230", "1700", "1730", "2000", "2030", "2359"
+                    "-1"
             ));
     /**
      * 定时唤醒的时间点列表
@@ -54,14 +54,14 @@ public class BaseModel extends Model {
     @Getter
     public static final ListModelField.ListJoinCommaToStringModelField wakenAtTimeList =
             new ListModelField.ListJoinCommaToStringModelField("wakenAtTimeList", "定时唤醒(关闭:-1)", ListUtil.newArrayList(
-                    "0650", "2350"
+                    "-1"
             ));
     /**
      * 能量收集的时间范围
      */
     @Getter
     public static final ListModelField.ListJoinCommaToStringModelField energyTime =
-            new ListModelField.ListJoinCommaToStringModelField("energyTime", "只收能量时间(范围|关闭:-1)", ListUtil.newArrayList("0700-0730"));
+            new ListModelField.ListJoinCommaToStringModelField("energyTime", "只收能量时间(范围|关闭:-1)", ListUtil.newArrayList("-1"));
 
     /**
      * 模块休眠时间范围
