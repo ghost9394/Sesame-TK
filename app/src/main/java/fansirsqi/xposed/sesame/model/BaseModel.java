@@ -46,7 +46,7 @@ public class BaseModel extends Model {
     @Getter
     public static final ListModelField.ListJoinCommaToStringModelField execAtTimeList =
             new ListModelField.ListJoinCommaToStringModelField("execAtTimeList", "定时执行(关闭:-1)", ListUtil.newArrayList(
-                    "-1"
+                    "0700", "0730", "1200", "1230", "1700", "1730", "2000", "2030", "2359"
             ));
     /**
      * 定时唤醒的时间点列表
@@ -54,7 +54,7 @@ public class BaseModel extends Model {
     @Getter
     public static final ListModelField.ListJoinCommaToStringModelField wakenAtTimeList =
             new ListModelField.ListJoinCommaToStringModelField("wakenAtTimeList", "定时唤醒(关闭:-1)", ListUtil.newArrayList(
-                    "-1"
+                    "0650", "2350"
             ));
     /**
      * 能量收集的时间范围
@@ -114,7 +114,7 @@ public class BaseModel extends Model {
      * 是否记录日志
      */
     @Getter
-    public static final BooleanModelField recordLog = new BooleanModelField("recordLog", "全部 | 记录日志", false);
+    public static final BooleanModelField recordLog = new BooleanModelField("recordLog", "全部 | 记录日志", true);
     /**
      * 是否显示气泡提示
      */
