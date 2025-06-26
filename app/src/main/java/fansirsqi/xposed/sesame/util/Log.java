@@ -132,12 +132,20 @@ public class Log {
         error(msg, stackTrace);
     }
 
+    public static void printStackTrace(String TAG, String msg, Throwable th) {
+        String stackTrace = "[" + TAG + "] Throwable error: " + android.util.Log.getStackTraceString(th);
+        error(msg, stackTrace);
+    }
 
     public static void printStackTrace(Exception e) {
         String stackTrace = "Exception error: " + android.util.Log.getStackTraceString(e);
         error(stackTrace);
     }
 
+    public static void printStackTrace(String msg, Exception e) {
+        String stackTrace = "Throwable error: " + android.util.Log.getStackTraceString(e);
+        error(msg, stackTrace);
+    }
 
     public static void printStackTrace(String TAG, String msg, Exception e) {
         String stackTrace = "[" + TAG + "] Throwable error: " + android.util.Log.getStackTraceString(e);
