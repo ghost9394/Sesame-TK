@@ -102,7 +102,6 @@ class MainActivity : BaseActivity() {
                 }
             })
         buildVersion.text = "Build Version: " + ViewAppInfo.appVersion // 版本信息
-        buildTarget.text = "Build Target: " + ViewAppInfo.appBuildTarget // 编译日期信息
     }
 
     override fun onResume() {
