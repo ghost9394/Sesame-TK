@@ -262,7 +262,7 @@ public class AntFarm extends ModelTask {
     @Override
     public void boot(ClassLoader classLoader) {
         super.boot(classLoader);
-        RpcIntervalLimit.addIntervalLimit("com.alipay.antfarm.enterFarm", 2000);
+        RpcIntervalLimit.INSTANCE.addIntervalLimit("com.alipay.antfarm.enterFarm", 2000);
     }
 
     @Override

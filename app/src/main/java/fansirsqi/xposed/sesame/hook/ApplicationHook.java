@@ -21,6 +21,7 @@ import androidx.annotation.NonNull;
 import org.luckypray.dexkit.DexKitBridge;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.List;
@@ -33,7 +34,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import fansirsqi.xposed.sesame.BuildConfig;
@@ -51,11 +51,11 @@ import fansirsqi.xposed.sesame.hook.rpc.bridge.RpcBridge;
 import fansirsqi.xposed.sesame.hook.rpc.bridge.RpcVersion;
 import fansirsqi.xposed.sesame.hook.rpc.debug.DebugRpc;
 import fansirsqi.xposed.sesame.hook.rpc.intervallimit.RpcIntervalLimit;
+import fansirsqi.xposed.sesame.hook.server.ModuleHttpServer;
 import fansirsqi.xposed.sesame.model.BaseModel;
 import fansirsqi.xposed.sesame.model.Model;
 import fansirsqi.xposed.sesame.task.BaseTask;
 import fansirsqi.xposed.sesame.task.ModelTask;
-import fansirsqi.xposed.sesame.task.TaskCommon;
 import fansirsqi.xposed.sesame.util.AssetUtil;
 import fansirsqi.xposed.sesame.util.Detector;
 import fansirsqi.xposed.sesame.util.Log;
@@ -64,10 +64,13 @@ import fansirsqi.xposed.sesame.util.Notify;
 import fansirsqi.xposed.sesame.util.PermissionUtil;
 import fansirsqi.xposed.sesame.util.StringUtil;
 import fansirsqi.xposed.sesame.util.TimeUtil;
+import fi.iki.elonen.NanoHTTPD;
 import lombok.Getter;
 
 public class ApplicationHook implements IXposedHookLoadPackage {
     static final String TAG = ApplicationHook.class.getSimpleName();
+
+    private ModuleHttpServer httpServer;
     private static final String modelVersion = BuildConfig.VERSION_NAME;
     private static final Map<String, PendingIntent> wakenAtTimeAlarmMap = new ConcurrentHashMap<>();
     @Getter
@@ -98,6 +101,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
     private static RpcVersion rpcVersion;
     private static PowerManager.WakeLock wakeLock;
     private static PendingIntent alarm0Pi;
+
     public static void setOffline(boolean offline) {
         ApplicationHook.offline = offline;
     }
@@ -181,8 +185,10 @@ public class ApplicationHook implements IXposedHookLoadPackage {
         } else if (General.PACKAGE_NAME.equals(loadPackageParam.packageName) && General.PACKAGE_NAME.equals(loadPackageParam.processName)) {
             try {
                 if (hooked) return;
+
+
                 appLloadPackageParam = loadPackageParam;
-                classLoader = loadPackageParam.classLoader;
+                classLoader = appLloadPackageParam.classLoader;
                 XposedHelpers.findAndHookMethod(Application.class, "attach", Context.class, new XC_MethodHook() {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
@@ -194,6 +200,14 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                         loadNativeLibs(context, AssetUtil.INSTANCE.getCheckerDestFile());
                         loadNativeLibs(context, AssetUtil.INSTANCE.getDexkitDestFile());
                         HookUtil.INSTANCE.fuckAccounLimit(loadPackageParam);
+                        if (ViewAppInfo.INSTANCE.isApkInDebug()) {
+                            try {
+                                httpServer = new ModuleHttpServer(8080, "ET3vB^#td87sQqKaY*eMUJXP");
+                                httpServer.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
+                            } catch (IOException e) {
+                                Log.printStackTrace(e);
+                            }
+                        }
                         super.afterHookedMethod(param);
                     }
                 });
@@ -269,7 +283,6 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                                     Log.runtime(TAG, "hook dexkit successfully");
                                 }
                                 service = appService;
-                                TaskCommon.update();
                                 mainHandler = new Handler(Looper.getMainLooper());
                                 AtomicReference<String> UserId = new AtomicReference<>();
                                 mainTask = BaseTask.newInstance("MAIN_TASK", () -> {
@@ -313,7 +326,6 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                                 if (initHandler(true)) {
                                     init = true;
                                 }
-                                Log.runtime(TAG, "是否休眠时间 " + TaskCommon.IS_MODULE_SLEEP_TIME);
                             }
                         }
 
@@ -324,8 +336,6 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                 Log.printStackTrace(TAG, t);
             }
 
-
-            //
             try {
                 XposedHelpers.findAndHookMethod("android.app.Service", classLoader, "onDestroy",
                         new XC_MethodHook() {
@@ -338,6 +348,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                                 Notify.updateStatusText("支付宝前台服务被销毁");
                                 destroyHandler(true);
                                 FriendWatch.unload();
+                                httpServer.stop();
                                 restartByBroadcast();
                             }
                         });
@@ -345,35 +356,9 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                 Log.runtime(TAG, "hook service onDestroy err");
                 Log.printStackTrace(TAG, t);
             }
-            try {
-                XposedHelpers.findAndHookMethod("com.alipay.mobile.common.fgbg.FgBgMonitorImpl", classLoader, "isInBackground",
-                        XC_MethodReplacement.returnConstant(false));
-            } catch (Throwable t) {
-                Log.runtime(TAG, "hook FgBgMonitorImpl method 1 err");
-                Log.printStackTrace(TAG, t);
-            }
-            try {
-                XposedHelpers.findAndHookMethod("com.alipay.mobile.common.fgbg.FgBgMonitorImpl", classLoader, "isInBackground",
-                        boolean.class, XC_MethodReplacement.returnConstant(false));
-            } catch (Throwable t) {
-                Log.runtime(TAG, "hook FgBgMonitorImpl method 2 err");
-                Log.printStackTrace(TAG, t);
-            }
-            try {
-                XposedHelpers.findAndHookMethod("com.alipay.mobile.common.fgbg.FgBgMonitorImpl", classLoader, "isInBackgroundV2",
-                        XC_MethodReplacement.returnConstant(false));
-            } catch (Throwable t) {
-                Log.runtime(TAG, "hook FgBgMonitorImpl method 3 err");
-                Log.printStackTrace(TAG, t);
-            }
-            try {
-                XposedHelpers.findAndHookMethod("com.alipay.mobile.common.transport.utils.MiscUtils", classLoader, "isAtFrontDesk",
-                        classLoader.loadClass("android.content.Context"), XC_MethodReplacement.returnConstant(true));
-                Log.runtime(TAG, "hook MiscUtils successfully");
-            } catch (Throwable t) {
-                Log.runtime(TAG, "hook MiscUtils err");
-                Log.printStackTrace(TAG, t);
-            }
+
+            HookUtil.INSTANCE.hookOtherService(loadPackageParam);
+
             hooked = true;
             Log.runtime(TAG, "load success: " + loadPackageParam.packageName);
         }
@@ -472,12 +457,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
         try {
             destroyHandler(force); // 销毁之前的处理程序
             Model.initAllModel(); //在所有服务启动前装模块配置
-            TaskCommon.update();
             if (service == null) {
-                return false;
-            }
-            if (TaskCommon.IS_MODULE_SLEEP_TIME) {
-                Log.record(TAG, "💤 模块休眠中,停止初始化");
                 return false;
             }
             if (force) {
@@ -593,7 +573,7 @@ public class ApplicationHook implements IXposedHookLoadPackage {
                     BaseModel.destroyData();
                     Status.unload();
                     Notify.stop();
-                    RpcIntervalLimit.clearIntervalLimit();
+                    RpcIntervalLimit.INSTANCE.clearIntervalLimit();
                     Config.unload();
                     UserMap.unload();
                 }

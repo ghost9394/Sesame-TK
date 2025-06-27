@@ -101,7 +101,7 @@
             android:id="@+id/btn_farm_log"
             android:onClick="onClick"
             android:text="@string/farm_log"
-            app:icon="@drawable/farm"
+            app:icon="@drawable/farm2"
             app:layout_constraintEnd_toStartOf="@id/btn_other_log"
             app:layout_constraintStart_toEndOf="@id/btn_forest_log"
             app:layout_constraintTop_toTopOf="parent" />
