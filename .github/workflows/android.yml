@@ -122,6 +122,20 @@ jobs:
           echo "$COMMIT_MESSAGE_BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: 向TG发送组合消息
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TG_CHAT_ID }}
+          token: ${{ secrets.TG_BOT_TOKEN }}
+          message: |
+            ${{ steps.extract_info.outputs.version }} Build!*
+            - Files: 
+            - Normal: `${{ steps.extract_info.outputs.normal_file }}`
+            - Branch: `${{ github.ref_name }}`
+            - Triggered by: `${{ github.actor }}`
+            ${{ steps.commit_details.outputs.COMMIT_MESSAGE_BODY }}
+          format: markdown
+          
       - name: Send Normal APK
         uses: appleboy/telegram-action@master
         with:
