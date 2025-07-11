@@ -171,7 +171,7 @@ jobs:
       - name: Sync Release to Target Repository
         uses: softprops/action-gh-release@v2
         with:
-          repository: Xposed-Modules-Repo/fansirsqi.xposed.sesame # 目标仓库的拥有者和仓库名称
+          repository: ghost9394/Sesame-TK # 目标仓库的拥有者和仓库名称
           name: ${{ github.event.release.tag_name || steps.extract_info.outputs.version }} # 发布的名称。默认为标签名称
           files: |
             ${{ steps.sign_normal_apk.outputs.signedFile }}
