@@ -112,7 +112,7 @@ class MainActivity : BaseActivity() {
             false // 如果不是目标视图，返回false
         }
         buildVersion.text = "Build Version: " + ViewAppInfo.appVersion // 版本信息
-        buildTarget.text = "Build Target: " + ViewAppInfo.appBuildTarget // 编译日期信息
+    ##    buildTarget.text = "Build Target: " + ViewAppInfo.appBuildTarget // 编译日期信息
         lifecycleScope.launch {
             val result = FansirsqiUtil.getOneWord()
             oneWord.text = result
