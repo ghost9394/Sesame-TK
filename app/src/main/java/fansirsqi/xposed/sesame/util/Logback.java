@@ -57,7 +57,7 @@ public class Logback {
         satbrp.setFileNamePattern(LOG_DIR + "bak/" + logName + "-%d{yyyy-MM-dd}.%i.log");
         satbrp.setMaxFileSize(FileSize.valueOf("50MB"));
         satbrp.setTotalSizeCap(FileSize.valueOf("100MB"));
-        satbrp.setMaxHistory(7);
+        satbrp.setMaxHistory(1);
         satbrp.setCleanHistoryOnStart(true);
         satbrp.setParent(rfa);
         satbrp.start();
