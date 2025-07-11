@@ -131,7 +131,6 @@ jobs:
 
             - Files: 
               - Normal: `${{ steps.extract_info.outputs.normal_file }}`
-              - Compatible: `${{ steps.extract_info.outputs.compatible_file }}`
             - Branch: `${{ github.ref_name }}`
             - Triggered by: `${{ github.actor }}`
 
@@ -152,6 +151,7 @@ jobs:
           echo "Creating tag: $VERSION_TAG"
           git tag "$VERSION_TAG"
           git push origin "$VERSION_TAG"
+          
       - name: Upload Assets to Source Release
         uses: softprops/action-gh-release@v2
         with:
@@ -167,22 +167,3 @@ jobs:
             ## ✨What's Changed
 
             ${{ steps.commit_details.outputs.COMMIT_MESSAGE_BODY }}
-
-      - name: Sync Release to Target Repository
-        uses: softprops/action-gh-release@v2
-        with:
-          repository: ghost9394/Sesame-TK # 目标仓库的拥有者和仓库名称
-          name: ${{ github.event.release.tag_name || steps.extract_info.outputs.version }} # 发布的名称。默认为标签名称
-          files: |
-            ${{ steps.sign_normal_apk.outputs.signedFile }}
-            CHECKSUMS-Sesame-Normal-${{ steps.extract_info.outputs.version }}.${{ env.SHORT_SHA }}-signed.apk.sha256
-          token: ${{ secrets.TARGET_REPO_PAT }}
-          tag_name: ${{ steps.extract_info.outputs.version }}
-          draft: false
-          prerelease: ${{ steps.pre_release.outputs.IS_PRERELEASE }}
-          append_body: false
-          make_latest: true
-          body: |
-            📦 本 Release 同步自源仓库 [Sesame-TK](https://github.com/${{ github.repository }})
-            ✨ **更新内容**:
-            ${{ github.event.release.body || '无更新说明' }}
