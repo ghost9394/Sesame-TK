@@ -110,8 +110,7 @@ object DeviceInfoUtil {
             "Product" to "${Build.MANUFACTURER} ${Build.PRODUCT}",
             "Device" to getDeviceName(),
             "System" to "Android ${Build.VERSION.RELEASE} (${Build.VERSION.SDK_INT})",
-            "OS Build" to "${Build.ID} ${Build.DISPLAY}",
-            "OTA" to getProp("ro.build.version.ota"),
+            "OS Build" to "${Build.ID}",
             "Android ID" to androidId,
             "Module Version" to "${BuildConfig.VERSION}-${BuildConfig.BUILD_TAG}.${BuildConfig.BUILD_TYPE} 📦",
             "Module Build" to "${BuildConfig.BUILD_DATE} ${BuildConfig.BUILD_TIME} ⏰"
