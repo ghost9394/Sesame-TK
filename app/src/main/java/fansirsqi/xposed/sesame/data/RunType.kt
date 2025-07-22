@@ -9,7 +9,7 @@ import lombok.Getter
 @Getter
 enum class RunType(val code: Int, val nickName: String) {
     DISABLE(0, "未激活"),
-    ACTIVE(1, "原神启动"),
+    ACTIVE(1, "已激活"),
     LOADED(2, "已加载");
 
     companion object {
