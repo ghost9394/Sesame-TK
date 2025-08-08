@@ -61,7 +61,7 @@ public class AntForestRpcCall {
         }
     }
 
-    public static String fillUserRobFlag(String userIdList) {
+    public static String fillUserRobFlag(JSONArray userIdList) {
         try {
             JSONObject arg = new JSONObject();
             arg.put("source", "chInfo_ch_appcenter__chsub_9patch");
@@ -76,7 +76,7 @@ public class AntForestRpcCall {
         }
     }
 
-    public static String fillUserRobFlag(String userIdList, boolean needFillUserInfo) {
+    public static String fillUserRobFlag(JSONArray userIdList, boolean needFillUserInfo) {
         try {
             JSONObject arg = new JSONObject();
             arg.put("source", "chInfo_ch_appcenter__chsub_9patch");
@@ -129,9 +129,10 @@ public class AntForestRpcCall {
     public static RpcEntity energyRpcEntity(String bizType, String userId, long bubbleId) {
         try {
             JSONObject args = new JSONObject();
-            JSONArray bubbleIds = new JSONArray(bubbleId);
+            JSONArray bubbleIds = new JSONArray();
+            bubbleIds.put(bubbleId);
             args.put("bizType", bizType);
-            args.put("bubbleId", bubbleIds);
+            args.put("bubbleIds", bubbleIds);
             args.put("source", "chInfo_ch_appcenter__chsub_9patch");
             args.put("userId", userId);
             args.put("version", VERSION);
@@ -153,10 +154,8 @@ public class AntForestRpcCall {
 
     public static RpcEntity batchEnergyRpcEntity(String bizType, String userId, List<Long> bubbleIds) throws JSONException {
         JSONObject arg = new JSONObject();
-        String bubbleIdList = StringUtil.collectionJoinString(",", bubbleIds);
-//        JSONArray _bubbleIds = new JSONArray(bubbleIdList);
         arg.put("bizType", bizType);
-        arg.put("bubbleIds", bubbleIdList);
+        arg.put("bubbleIds", new JSONArray(bubbleIds));
         arg.put("fromAct", "BATCH_ROB_ENERGY");
         arg.put("source", "chInfo_ch_appcenter__chsub_9patch");
         arg.put("userId", userId);
