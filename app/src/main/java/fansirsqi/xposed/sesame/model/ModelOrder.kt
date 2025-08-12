@@ -15,7 +15,7 @@ object ModelOrder {
         BaseModel::class.java,       // 基础设置
         AntForest::class.java,       // 森林
         AntFarm::class.java,         // 庄园
-//        AntOrchard::class.java,    // 农场
+        AntOrchard::class.java,    // 农场
         AntOcean::class.java,        // 海洋
         AntDodo::class.java,       // 神奇物种
         AncientTree::class.java,     // 古树
@@ -23,7 +23,7 @@ object ModelOrder {
         Reserve::class.java,       // 保护地
         AntSports::class.java,       // 运动
 //        AntMember::class.java,     // 会员
-//        AntStall::class.java,      // 蚂蚁新村
+        AntStall::class.java,      // 蚂蚁新村
 //        GreenFinance::class.java,  // 绿色经营
 //        AntBookRead::class.java,   // 读书
 //        ConsumeGold::class.java,   // 消费金
