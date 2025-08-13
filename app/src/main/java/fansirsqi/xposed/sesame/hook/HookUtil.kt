@@ -218,7 +218,7 @@ object HookUtil {
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
                         // 强制将 runType 参数替换为 RunType.ACTIVE.nickName（"已激活"）
-                        param.args[0] = "已激活"
+                        param.args[0] = "原神启动"
                     }
                 }
             )
