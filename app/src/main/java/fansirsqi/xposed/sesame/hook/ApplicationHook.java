@@ -311,7 +311,7 @@ public class ApplicationHook  implements IXposedHookLoadPackage {
                                             Log.record(TAG, "️⚙跳过执行-用户模块配置未加载");
                                             return;
                                         }
-                                        Log.record(TAG, "开始执行");
+                                        Log.record(TAG, "🎃🎃🎃🎃🎃🎃🎃🎃🎃🎃");
                                         long currentTime = System.currentTimeMillis();
                                         if (lastExecTime + 2000 > currentTime) {
                                             Log.record(TAG, "执行间隔较短，跳过执行");
