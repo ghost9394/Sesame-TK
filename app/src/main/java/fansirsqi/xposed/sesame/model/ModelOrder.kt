@@ -10,6 +10,7 @@ import fansirsqi.xposed.sesame.task.antOcean.AntOcean
 import fansirsqi.xposed.sesame.task.antSports.AntSports
 import fansirsqi.xposed.sesame.task.antStall.AntStall
 import fansirsqi.xposed.sesame.task.reserve.Reserve
+import fansirsqi.xposed.sesame.task.antOrchard.AntOrchard
 
 object ModelOrder {
     private val array = arrayOf(
@@ -17,7 +18,7 @@ object ModelOrder {
 //        Antinvoice::class.java,      // 蚂蚁发票
         AntForest::class.java,       // 森林
         AntFarm::class.java,         // 庄园
-//        AntOrchard::class.java,    // 农场
+        AntOrchard::class.java,    // 农场
         AntOcean::class.java,        // 海洋
         AntDodo::class.java,       // 神奇物种
 //        AncientTree::class.java,     // 古树
