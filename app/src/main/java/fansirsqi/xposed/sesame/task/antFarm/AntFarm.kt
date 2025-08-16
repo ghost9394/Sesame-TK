@@ -211,7 +211,7 @@ class AntFarm : ModelTask() {
 
     override fun getFields(): ModelFields {
         val modelFields = ModelFields()
-        modelFields.addField(StringModelField("sleepTime", "小鸡睡觉时间(关闭:-1)", "2330").also { sleepTime = it })
+        modelFields.addField(StringModelField("sleepTime", "小鸡睡觉时间(关闭:-1)", "-1").also { sleepTime = it })
         modelFields.addField(IntegerModelField("sleepMinutes", "小鸡睡觉时长(分钟)", 10 * 36, 1, 10 * 60).also { sleepMinutes = it })
         modelFields.addField(ChoiceModelField("recallAnimalType", "召回小鸡", RecallAnimalType.Companion.ALWAYS, RecallAnimalType.Companion.nickNames).also {
             recallAnimalType = it
