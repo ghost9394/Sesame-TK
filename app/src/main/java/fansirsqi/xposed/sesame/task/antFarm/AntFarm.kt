@@ -728,39 +728,12 @@ class AntFarm : ModelTask() {
      * 自动喂鸡
      */
     private fun handleAutoFeedAnimal() {
-        // 检查ownerAnimal是否已正确初始化
-        if (ownerAnimal.animalId == null) {
-            Log.record(TAG, "🐔 当前ownerAnimal信息 - ID: ${ownerAnimal.animalId}, 主人农场ID: ${ownerAnimal.masterFarmId}, 当前农场ID: ${ownerAnimal.currentFarmId}")
-            syncAnimalStatus(ownerFarmId)
-            // 重新检查
-            if (ownerAnimal.animalId == null) {
-                Log.record(TAG, "🐔 错误：无法获取小鸡信息，跳过自动喂食")
-                return
-            }
-        }
-
-        // 打印小鸡状态和ID信息
-        Log.record(TAG, "🐔 小鸡状态检查 - ID: ${ownerAnimal.animalId}, 互动状态: ${ownerAnimal.animalInteractStatus}, 饲料状态: ${ownerAnimal.animalFeedStatus}, 位置类型: ${ownerAnimal.locationType}")
-        // 检查状态是否为空
-        if (ownerAnimal.animalInteractStatus == null || ownerAnimal.animalFeedStatus == null) {
-            Log.record(TAG, "🐔 警告：小鸡状态信息不完整，尝试重新同步")
-            syncAnimalStatus(ownerFarmId)
-            // 重新检查
-            if (ownerAnimal.animalInteractStatus == null || ownerAnimal.animalFeedStatus == null) {
-                Log.record(TAG, "🐔 错误：无法获取完整的小鸡状态信息，跳过自动喂食")
-                return
-            }
-        }
-
         if (AnimalInteractStatus.HOME.name != ownerAnimal.animalInteractStatus) {
-            Log.record(TAG, "🐔 小鸡不在家，跳过自动喂食逻辑")
             return  // 小鸡不在家，不执行喂养逻辑
         }
-
         var needReload = false
         // 1. 判断是否需要喂食
         if (AnimalFeedStatus.HUNGRY.name == ownerAnimal.animalFeedStatus) {
-            Log.record(TAG, "🐔 小鸡饥饿状态，当前饲料库存: ${foodStock}g")
             if (feedAnimal!!.value) {
                 Log.record("小鸡在挨饿~Tk 尝试为你自动喂食")
                 if (feedAnimal(ownerFarmId)) {
@@ -771,7 +744,6 @@ class AntFarm : ModelTask() {
 
         // 2. 使用加饭卡（仅当正在吃饭且开启配置）
         if (useBigEaterTool!!.value && AnimalFeedStatus.EATING.name == ownerAnimal.animalFeedStatus) {
-            Log.record(TAG, "🐔 小鸡正在吃饭，尝试使用加饭卡")
             val result = useFarmTool(ownerFarmId, ToolType.BIG_EATER_TOOL)
             if (result) {
                 Log.farm("使用道具🎭[加饭卡]！")
@@ -784,7 +756,6 @@ class AntFarm : ModelTask() {
 
         // 3. 判断是否需要使用加速道具
         if (useAccelerateTool!!.value && AnimalFeedStatus.HUNGRY.name != ownerAnimal.animalFeedStatus) {
-            Log.record(TAG, "🐔 检查是否需要使用加速道具，当前状态: ${ownerAnimal.animalFeedStatus}")
             if (useAccelerateTool()) {
                 needReload = true
             }
@@ -792,7 +763,6 @@ class AntFarm : ModelTask() {
 
         // 4. 如果有操作导致状态变化，则刷新庄园信息
         if (needReload) {
-            Log.record(TAG, "🐔 状态发生变化，刷新庄园信息")
             enterFarm()
             syncAnimalStatus(ownerFarmId)
         }
@@ -807,8 +777,6 @@ class AntFarm : ModelTask() {
                 allFoodHaveEatten += animal.foodHaveEatten!!
                 allConsumeSpeed += animal.consumeSpeed!!
             }
-
-            Log.record(TAG, "🐔 喂食计算 - 已吃饲料: ${allFoodHaveEatten}g, 消耗速度: ${allConsumeSpeed}g/s, 开始时间: ${TimeUtil.getCommonDate(startEatTime)}")
 
             if (allConsumeSpeed > 0) {
                 val nextFeedTime = startEatTime + ((180 - allFoodHaveEatten) / allConsumeSpeed).toLong() * 1000
@@ -1839,21 +1807,9 @@ class AntFarm : ModelTask() {
 
             // 小鸡列表
             val jaAnimals = subFarmVO.getJSONArray("animals")
-            Log.record(TAG, "🐔 解析小鸡列表，共${jaAnimals.length()}只小鸡")
             animals = Array(jaAnimals.length()) { i ->
                 val animalJson = jaAnimals.getJSONObject(i)
-               // Log.record(TAG, "🐔 小鸡${i+1} 原始JSON: $animalJson")
                 val animal: Animal = objectMapper.readValue(animalJson.toString(), Animal::class.java)
-
-                // 手动从animalStatusVO中获取状态信息
-                if (animalJson.has("animalStatusVO")) {
-                    val animalStatusVO = animalJson.getJSONObject("animalStatusVO")
-                    animal.animalInteractStatus = animalStatusVO.getString("animalInteractStatus")
-                    animal.animalFeedStatus = animalStatusVO.getString("animalFeedStatus")
-                } else {
-                    Log.record(TAG, "🐔 小鸡${i+1} 没有animalStatusVO对象")
-                }
-                Log.record(TAG, "🐔 小鸡${i+1} - ID: ${animal.animalId}, 主人农场ID: ${animal.masterFarmId}, 当前农场ID: ${animal.currentFarmId}, 互动状态: ${animal.animalInteractStatus}, 饲料状态: ${animal.animalFeedStatus}")
                 if (animal.masterFarmId == ownerFarmId) {
                     ownerAnimal = animal
                 }
@@ -2734,6 +2690,10 @@ class AntFarm : ModelTask() {
         @JsonProperty("currentFarmMasterUserId")
         var currentFarmMasterUserId: String? = null
 
+        var animalFeedStatus: String? = null
+
+        var animalInteractStatus: String? = null
+
         @JsonProperty("locationType")
         var locationType: String? = null
 
@@ -2745,10 +2705,6 @@ class AntFarm : ModelTask() {
 
         @JsonProperty("foodHaveEatten")
         var foodHaveEatten: Double? = null
-
-        // 状态信息从animalStatusVO中获取
-        var animalFeedStatus: String? = null
-        var animalInteractStatus: String? = null
 
     }
 
