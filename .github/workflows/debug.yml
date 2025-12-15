@@ -1,3 +1,4 @@
+
 name: 🐞 Build Debug APK
 run-name: 🐞 Debug Build - ${{ github.actor }}
 
