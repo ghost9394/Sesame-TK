@@ -76,6 +76,26 @@ jobs:
           name: debug-apk-arm64-v8a
           path: ${{ steps.locate_apks.outputs.arm64_apk }}
 
+      - name: 🚀 Upload Debug APK - armeabi-v7a
+        if: steps.locate_apks.outputs.armv7_apk != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk-armeabi-v7a
+          path: ${{ steps.locate_apks.outputs.armv7_apk }}
+
+      - name: 🚀 Upload Debug APK - x86
+        if: steps.locate_apks.outputs.x86_apk != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk-x86
+          path: ${{ steps.locate_apks.outputs.x86_apk }}
+
+      - name: 🚀 Upload Debug APK - x86_64
+        if: steps.locate_apks.outputs.x86_64_apk != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk-x86_64
+          path: ${{ steps.locate_apks.outputs.x86_64_apk }}
 
       - name: 🚀 Upload Debug APK - Universal
         if: steps.locate_apks.outputs.universal_apk != ''
