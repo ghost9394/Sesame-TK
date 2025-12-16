@@ -41,10 +41,9 @@ class BaseModel : Model() {
             updateHooks(
                 enableCaptchaUIHook.value
             )
-            Log.runtime(TAG, "✅ 验证码Hook配置已同步")
+            Log.record(TAG, "✅ 验证码Hook配置已同步")
         } catch (t: Throwable) {
-            Log.error(TAG, "❌ 验证码Hook配置同步失败")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "❌ 验证码Hook配置同步失败", t)
         }
     }
 
@@ -79,6 +78,7 @@ class BaseModel : Model() {
         modelFields.addField(enableOnGoing) //是否开启状态栏禁删
         modelFields.addField(languageSimplifiedChinese) //是否只显示中文并设置时区
         modelFields.addField(toastOffsetY) //气泡提示的纵向偏移量
+        modelFields.addField(toastPerfix)//气泡提示的前缀
         return modelFields
     }
 
@@ -127,6 +127,7 @@ class BaseModel : Model() {
                 "0010", "0030", "0100", "0700", "0730", "1200", "1230", "1700", "1730", "2000", "2030", "2359"
             )
         )
+
 
         /**
          * 定时唤醒的时间点列表
@@ -220,6 +221,9 @@ class BaseModel : Model() {
          */
         @Getter
         val showToast: BooleanModelField = BooleanModelField("showToast", "气泡提示", true)
+
+        @Getter
+        val toastPerfix: StringModelField = StringModelField("toastPerfix", "气泡前缀", null)
 
         /**
          * 气泡提示的纵向偏移量

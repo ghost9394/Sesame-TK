@@ -577,7 +577,7 @@ public class ApplicationHook {
                             Log.runtime(TAG, "onResume targetUid: " + targetUid);
                             if (targetUid == null) {
                                 Log.record(TAG, "onResume:用户未登录");
-                                Toast.show("用户未登录");
+                                Toast.INSTANCE.show("用户未登录");
                                 return;
                             }
                             if (!init) {
@@ -594,7 +594,7 @@ public class ApplicationHook {
                                     initHandler(true);  // 重新初始化
                                     lastExecTime = 0;   // 重置执行时间，防止被间隔逻辑拦截
                                     Log.record(TAG, "用户已切换");
-                                    Toast.show("用户已切换");
+                                    Toast.INSTANCE.show("用户已切换");
                                     return;
                                 }
                                 HookUtil.INSTANCE.hookUser(classLoader);
@@ -850,7 +850,7 @@ public class ApplicationHook {
                 String userId = HookUtil.INSTANCE.getUserId(classLoader);
                 if (userId == null) {
                     Log.record(TAG, "initHandler: 用户未登录");
-                    Toast.show("用户未登录");
+                    Toast.INSTANCE.show("用户未登录");
                     return false;
                 }
 
@@ -864,7 +864,7 @@ public class ApplicationHook {
                 Config.load(userId); // 加载配置
                 if (!Config.isLoaded()) {
                     Log.record(TAG, "用户模块配置加载失败");
-                    Toast.show("用户模块配置加载失败");
+                    Toast.INSTANCE.show("用户模块配置加载失败");
                     return false;
                 }
 
@@ -953,7 +953,7 @@ public class ApplicationHook {
                         mainHandler.postDelayed(
                                 () -> {
                                     if (!PermissionUtil.checkOrRequestBatteryPermissions(appContext)) {
-                                        Toast.show("请授予支付宝始终在后台运行权限");
+                                        Toast.INSTANCE.show("请授予支付宝始终在后台运行权限");
                                     }
                                 },
                                 2000);
@@ -967,7 +967,7 @@ public class ApplicationHook {
                 updateDay();
                 String successMsg = "芝麻粒-TK 加载成功✨";
                 Log.record(successMsg);
-                Toast.show(successMsg);
+                Toast.INSTANCE.show(successMsg);
             }
             offline = false;
             init = true;
@@ -976,7 +976,7 @@ public class ApplicationHook {
             return true;
         } catch (Throwable th) {
             Log.printStackTrace(TAG, "startHandler", th);
-            Toast.show("芝麻粒加载失败 🎃");
+            Toast.INSTANCE.show("芝麻粒加载失败 🎃");
             return false;
         }
     }

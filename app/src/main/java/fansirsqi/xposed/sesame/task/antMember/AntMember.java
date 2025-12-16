@@ -401,7 +401,7 @@ public class AntMember extends ModelTask {
             String source = "DNHZ_NC_zhimajingnangSF"; // 从buttonUrl提取的source
             Log.runtime(TAG, "set Wua " + wua);
 
-            String spreadManureDataStr = AntOrchardRpcCall.orchardSpreadManure(wua, source);
+            String spreadManureDataStr = AntOrchardRpcCall.INSTANCE.orchardSpreadManure(wua, source);
             JSONObject spreadManureData;
             try {
               spreadManureData = new JSONObject(spreadManureDataStr);

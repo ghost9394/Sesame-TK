@@ -527,25 +527,20 @@ object EnergyWaitingManager {
 
                 // 更新最后执行时间
                 lastExecuteTime.set(System.currentTimeMillis())
-
                 // 验证执行时机是否正确
                 val actualTime = System.currentTimeMillis()
                 val energyTimeRemain = (task.produceTime - actualTime) / 1000
                 val isEnergyMature = task.produceTime <= actualTime
-
                 // 自己的账号：只检查能量成熟时间，不检查保护
                 // 好友账号：检查能量成熟和保护结束
                 val protectionEndTime = if (task.isSelf()) 0L else task.getProtectionEndTime()
                 val isProtectionEnd = if (task.isSelf()) true else protectionEndTime <= actualTime
-
                 if (energyTimeRemain > 300) { // 如果还有超过5分钟才成熟，直接跳过
                     Log.debug(TAG, "⚠️ 能量距离成熟还有${energyTimeRemain}秒，时机过早，跳过本次收取")
                     return@withLock
                 }
-
                 // 判断是否需要详细日志（未成熟或刚成熟2分钟内）
                 val needDetailLog = !isEnergyMature || (!task.isSelf() && !isProtectionEnd) || energyTimeRemain > -120
-
                 if (needDetailLog) {
                     // 详细调试日志：用于未成熟或刚成熟的任务
                     Log.record(TAG, "🔍 蹲点任务[${task.getUserTypeTag()}${task.userName}]时机检查详情：")
