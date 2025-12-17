@@ -601,7 +601,10 @@ class AntFarm : ModelTask() {
             if (enterFarm() == null) {
                 return
             }
-
+            // 雇佣小鸡
+            if (hireAnimal!!.value) {
+                hireAnimal()
+            }
             handleAutoFeedAnimal()
             tc.countDebug("喂食")
 
@@ -713,10 +716,7 @@ class AntFarm : ModelTask() {
                     Log.record(TAG, "抽抽乐未到执行时间，跳过")
                 }
             }
-            // 雇佣小鸡
-            if (hireAnimal!!.value) {
-                hireAnimal()
-            }
+
             if (getFeed!!.value) {
                 letsGetChickenFeedTogether()
                 tc.countDebug("一起拿饲料")
@@ -973,7 +973,7 @@ class AntFarm : ModelTask() {
                     ChildModelTask(
                         sleepTaskId,
                         "AS",
-                        Runnable { this.animalSleepNow() },
+                        suspendRunnable = { this.animalSleepNow() },
                         animalSleepTime
                     )
                 )
@@ -989,7 +989,7 @@ class AntFarm : ModelTask() {
                     ChildModelTask(
                         wakeUpTaskId,
                         "AW",
-                        Runnable { this.animalWakeUpNow() },
+                        suspendRunnable = { this.animalWakeUpNow() },
                         animalWakeUpTime
                     )
                 )
@@ -1016,7 +1016,7 @@ class AntFarm : ModelTask() {
      *
      * @return 庄园信息
      */
-    private  fun enterFarm(): JSONObject? {
+    private fun enterFarm(): JSONObject? {
         try {
             val userId = UserMap.currentUid
             val jo = JSONObject(AntFarmRpcCall.enterFarm(userId, userId))
@@ -1172,22 +1172,23 @@ class AntFarm : ModelTask() {
                         val taskId = "FA|$ownerFarmId"
                         addChildTask(
                             ChildModelTask(
-                                taskId,
-                                "FA",
-                                Runnable {
+                                id = taskId,
+                                group = "FA",
+                                suspendRunnable = {
                                     try {
                                         Log.record(TAG, "🔔 蹲点投喂任务触发")
                                         // 重新进入庄园，获取最新状态
                                         enterFarm()
                                         // 同步最新状态
                                         syncAnimalStatus(ownerFarmId)
+                                        handleAutoFeedAnimal()
                                         Log.record(TAG, "🔄 下一次蹲点任务已创建")
                                     } catch (e: Exception) {
                                         Log.error(TAG, "蹲点投喂任务执行失败: ${e.message}")
                                         Log.printStackTrace(TAG, e)
                                     }
                                 },
-                                nextFeedTime
+                                execTime = nextFeedTime
                             )
                         )
                         Log.record(
@@ -3006,7 +3007,7 @@ class AntFarm : ModelTask() {
                             ChildModelTask(
                                 taskId,
                                 "HIRE",
-                                Runnable { this.hireAnimal() },
+                                suspendRunnable = { this.hireAnimal() },
                                 beHiredEndTime
                             )
                         )
@@ -3019,7 +3020,7 @@ class AntFarm : ModelTask() {
                             ChildModelTask(
                                 taskId,
                                 "HIRE",
-                                Runnable { this.hireAnimal() },
+                                suspendRunnable = { this.hireAnimal() },
                                 beHiredEndTime
                             )
                         )
@@ -3162,7 +3163,7 @@ class AntFarm : ModelTask() {
                                         ChildModelTask(
                                             "HIRE|$animalId",
                                             "HIRE",
-                                            Runnable { this.hireAnimal() },
+                                            suspendRunnable = { this.hireAnimal() },
                                             beHiredEndTime
                                         )
                                     )
