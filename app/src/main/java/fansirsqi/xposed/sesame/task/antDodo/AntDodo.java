@@ -122,8 +122,7 @@ public class AntDodo extends ModelTask {
                 Log.runtime(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "AntDodo Collect err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "AntDodo Collect err:",t);
         }
     }
     private void collectAnimalCard() {
@@ -185,8 +184,7 @@ public class AntDodo extends ModelTask {
                 Log.runtime(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "AntDodo CollectAnimalCard err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG,"AntDodo CollectAnimalCard err:",t);
         }
     }
     /**
@@ -209,7 +207,6 @@ public class AntDodo extends ModelTask {
                 // 检查响应结果码是否成功
                 if (!ResChecker.checkRes(TAG, jsonResponse)) {
                     Log.record(TAG, "查询任务列表失败：" + jsonResponse.getString("resultDesc"));
-                    Log.runtime(response);
                     break;
                 }
                 // 获取任务组信息列表
@@ -264,11 +261,9 @@ public class AntDodo extends ModelTask {
                 if (!doubleCheck) break;
             }
         } catch (JSONException e) {
-            Log.error(TAG, "神奇物种 JSON解析错误: " + e.getMessage());
-            Log.printStackTrace(TAG, e);
+            Log.printStackTrace(TAG,"神奇物种 JSON解析错误: " + e.getMessage(),e);
         } catch (Throwable t) {
-            Log.runtime(TAG, "AntDodo ReceiveTaskAward 错误:");
-            Log.printStackTrace(TAG, t); // 打印异常栈
+            Log.printStackTrace(TAG, "AntDodo ReceiveTaskAward 错误:",t); // 打印异常栈
         }
     }
     private void propList() {
@@ -326,8 +321,7 @@ public class AntDodo extends ModelTask {
                 break;
             } while (true);
         } catch (Throwable th) {
-            Log.runtime(TAG, "AntDodo PropList err:");
-            Log.printStackTrace(TAG, th);
+            Log.printStackTrace(TAG, "AntDodo PropList err:",th);
         }
     }
     /**
@@ -368,8 +362,7 @@ public class AntDodo extends ModelTask {
                 }
             }
         } catch (Throwable th) {
-            Log.runtime(TAG, "AntDodo SendAntDodoCard err:");
-            Log.printStackTrace(TAG, th);
+            Log.printStackTrace(TAG, "AntDodo SendAntDodoCard err:",th);
         }
     }
     private void sendCard(JSONObject animal, String targetUser) {
@@ -384,8 +377,7 @@ public class AntDodo extends ModelTask {
                 Log.runtime(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable th) {
-            Log.runtime(TAG, "AntDodo SendCard err:");
-            Log.printStackTrace(TAG, th);
+            Log.printStackTrace(TAG, "AntDodo SendCard err:",th);
         }
     }
     private void collectToFriend() {
@@ -450,10 +442,10 @@ public class AntDodo extends ModelTask {
                 }
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "AntDodo CollectHelpFriend err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "AntDodo CollectHelpFriend err:",t);
         }
     }
+
     /**
      * 自动合成图鉴
      */
@@ -495,8 +487,7 @@ public class AntDodo extends ModelTask {
                 pageStart += pageSize; // 更新下一页起始
             } while (hasMore);
         } catch (Throwable t) {
-            Log.runtime(TAG, "generateBookMedal err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "generateBookMedal err:",t);
         }
     }
 

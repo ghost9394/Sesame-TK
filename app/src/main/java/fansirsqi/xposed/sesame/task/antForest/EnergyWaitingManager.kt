@@ -282,6 +282,7 @@ object EnergyWaitingManager {
                         )
                         // 移除无效的蹲点任务
                         waitingTasks.remove(taskId)
+                        EnergyWaitingPersistence.saveTasks(waitingTasks)
                         return@withLock
                     }
                 } else if (isSelf) {
@@ -301,6 +302,7 @@ object EnergyWaitingManager {
                     Log.debug(TAG, "能量球[$bubbleId]等待时间过长(${waitTime/1000/60}分钟)，跳过蹲点")
                     // 移除过长的任务
                     waitingTasks.remove(taskId)
+                    EnergyWaitingPersistence.saveTasks(waitingTasks)
                     return@withLock
                 }
 
@@ -317,6 +319,7 @@ object EnergyWaitingManager {
 
                 // 移除旧任务（如果存在）
                 waitingTasks.remove(taskId)
+                EnergyWaitingPersistence.saveTasks(waitingTasks)
 
                 // 添加新任务
                 waitingTasks[taskId] = task
@@ -483,6 +486,7 @@ object EnergyWaitingManager {
                 } else {
                     Log.error(TAG, "精确蹲点任务[${task.taskId}]不满足重试条件，放弃")
                     waitingTasks.remove(task.taskId)
+                    EnergyWaitingPersistence.saveTasks(waitingTasks)
                 }
             }
         }
@@ -626,6 +630,7 @@ object EnergyWaitingManager {
                         } else {
                             Log.record(TAG, "  → 已达最大重试次数")
                             waitingTasks.remove(task.taskId)
+                            EnergyWaitingPersistence.saveTasks(waitingTasks)
                         }
                     }
                 } else {
@@ -672,6 +677,7 @@ object EnergyWaitingManager {
                             } else {
                                 Log.record(TAG, "  → 已达最大重试次数")
                                 waitingTasks.remove(task.taskId)
+                                EnergyWaitingPersistence.saveTasks(waitingTasks)
                             }
                         }
                     }

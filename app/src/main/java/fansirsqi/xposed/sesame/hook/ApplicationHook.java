@@ -489,6 +489,7 @@ public class ApplicationHook {
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "验证码Hook初始化失败", t);
         }
+
         try {
             // 在Hook Application.attach 之前，先 deoptimize LoadedApk.makeApplicationInner
             try {
@@ -507,6 +508,8 @@ public class ApplicationHook {
                     if (General.PACKAGE_NAME.equals(finalProcessName) || (finalProcessName != null && finalProcessName.endsWith(":widgetProvider"))) {
                         registerBroadcastReceiver(appContext);
                     }
+                    // SecurityBodyHelper初始化
+                    SecurityBodyHelper.INSTANCE.init(classLoader);
 
                     // ✅ 优先使用 Hook 捕获的版本号
                     if (VersionHook.hasVersion()) {
@@ -1359,6 +1362,8 @@ public class ApplicationHook {
         intentFilter.addAction(BroadcastActions.RPC_TEST); // 调试RPC的动作
         return intentFilter;
     }
+
+
 
 }
 

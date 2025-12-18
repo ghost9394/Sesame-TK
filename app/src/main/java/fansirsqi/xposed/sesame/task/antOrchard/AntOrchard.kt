@@ -4,6 +4,7 @@ import android.util.Base64
 import fansirsqi.xposed.sesame.data.Status
 import fansirsqi.xposed.sesame.data.StatusFlags
 import fansirsqi.xposed.sesame.entity.AlipayUser
+import fansirsqi.xposed.sesame.hook.SecurityBodyHelper
 import fansirsqi.xposed.sesame.model.ModelFields
 import fansirsqi.xposed.sesame.model.ModelGroup
 import fansirsqi.xposed.sesame.model.modelFieldExt.BooleanModelField
@@ -13,12 +14,7 @@ import fansirsqi.xposed.sesame.task.ModelTask
 import fansirsqi.xposed.sesame.task.TaskCommon
 import fansirsqi.xposed.sesame.task.adexchange.UrlUtil
 import fansirsqi.xposed.sesame.task.adexchange.XLightRpcCall
-import fansirsqi.xposed.sesame.util.CoroutineUtils
-import fansirsqi.xposed.sesame.util.Detector
-import fansirsqi.xposed.sesame.util.Log
-import fansirsqi.xposed.sesame.util.Notify
-import fansirsqi.xposed.sesame.util.RandomUtil
-import fansirsqi.xposed.sesame.util.ResChecker
+import fansirsqi.xposed.sesame.util.*
 import fansirsqi.xposed.sesame.util.maps.UserMap
 import org.json.JSONObject
 
@@ -154,10 +150,7 @@ class AntOrchard : ModelTask() {
             if (!Status.hasFlagToday(StatusFlags.FLAG_ANTORCHARD_WIDGET_DAILY_AWARD)) {
                 receiveOrchardVisitAward()
             }
-
-
             limitedTimeChallenge()
-
             // 施肥
             val orchardSpreadManureCountValue = orchardSpreadManureCount.value
             if (orchardSpreadManureCountValue > 0 && Status.canSpreadManureToday(userId!!)) {
@@ -256,14 +249,13 @@ class AntOrchard : ModelTask() {
                     }
 
                     if (200 - wateringLeftTimes < orchardSpreadManureCount.value) {
-                        val wua = Detector.genWua()
-                        Log.runtime(TAG, "set Wua $wua")
+                        val wua = SecurityBodyHelper.getSecurityBodyData(4).toString()
+                        Log.record(TAG, "set Wua $wua")
                         // 随机选一个来源，确保完成其他任务 例如芝麻信誉的跳转，小组件的跳转
                         val randomSource = sourceList.random()
                         val spreadManureData = JSONObject(AntOrchardRpcCall.orchardSpreadManure(wua, randomSource))
                         if (spreadManureData.getString("resultCode") != "100") {
                             Log.record(TAG, "芭芭农场 orchardSpreadManure 错误：" + spreadManureData.getString("resultDesc"))
-                            Log.runtime(TAG, "芭芭农场 orchardSpreadManure 错误：" + spreadManureData.toString())
                             return
                         }
 
@@ -709,7 +701,8 @@ class AntOrchard : ModelTask() {
                             Log.record(TAG, "施肥任务需补充 $need 次")
 
                             repeat(need) { index ->
-                                val spreadResult = AntOrchardRpcCall.orchardSpreadManure("", "ch_appcenter__chsub_9patch")
+                                val wua = SecurityBodyHelper.getSecurityBodyData(4).toString()
+                                val spreadResult = AntOrchardRpcCall.orchardSpreadManure(wua, "ch_appcenter__chsub_9patch")
                                 Log.record(TAG, "施肥第 ${index + 1} 次结果：$spreadResult")
 
                                 val resultJson = JSONObject(spreadResult)

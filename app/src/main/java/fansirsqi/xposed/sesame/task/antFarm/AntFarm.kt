@@ -747,8 +747,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "AntFarm 协程被取消")
             throw e  // 必须重新抛出以保证取消机制正常工作
         } catch (t: Throwable) {
-            Log.runtime(TAG, "AntFarm.start.run err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "AntFarm.start.run err:",t)
         } finally {
             Log.record(TAG, "执行结束-蚂蚁$name")
         }
@@ -864,8 +863,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "paradiseCoinExchangeBenefit 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "paradiseCoinExchangeBenefit err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "paradiseCoinExchangeBenefit err:",t)
         }
     }
 
@@ -892,8 +890,7 @@ class AntFarm : ModelTask() {
                 }
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "exchangeBenefit err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "exchangeBenefit err:",t)
         }
         return false
     }
@@ -903,8 +900,7 @@ class AntFarm : ModelTask() {
             val jo = JSONObject(AntFarmRpcCall.exchangeBenefit(spuId, skuId))
             return ResChecker.checkRes(TAG, jo)
         } catch (t: Throwable) {
-            Log.runtime(TAG, "exchangeBenefit err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "exchangeBenefit err:",t)
         }
         return false
     }
@@ -929,8 +925,7 @@ class AntFarm : ModelTask() {
                 }
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "isItemExchange err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "isItemExchange err:",t)
         }
         return false
     }
@@ -1006,8 +1001,7 @@ class AntFarm : ModelTask() {
                 }
             }
         } catch (e: Exception) {
-            Log.runtime(TAG, "animalSleepAndWake err:")
-            Log.printStackTrace(e)
+            Log.printStackTrace(TAG,"animalSleepAndWake err:",e)
         }
     }
 
@@ -1206,8 +1200,7 @@ class AntFarm : ModelTask() {
                     }
                 }
             } catch (e: Exception) {
-                Log.error(TAG, "创建蹲点任务失败: ${e.message}")
-                Log.printStackTrace(e)
+                Log.printStackTrace(TAG, "创建蹲点任务失败: ${e.message}",e)
             }
         } else {
             // 小鸡在睡觉，跳过创建蹲点投喂任务
@@ -1248,8 +1241,7 @@ class AntFarm : ModelTask() {
                 }
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "animalSleepNow err:")
-            Log.printStackTrace(t)
+            Log.printStackTrace(TAG, "animalSleepNow err:",t)
         }
     }
 
@@ -1270,11 +1262,9 @@ class AntFarm : ModelTask() {
                 }
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "animalWakeUpNow err:")
-            Log.printStackTrace(t)
+            Log.printStackTrace(TAG, "animalWakeUpNow err:",t)
         }
     }
-
 
     /**
      * 同步小鸡状态通用方法
@@ -1378,8 +1368,7 @@ class AntFarm : ModelTask() {
                 rewardList = null
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "rewardFriend err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG,"rewardFriend err:", t)
         }
     }
 
@@ -1403,8 +1392,7 @@ class AntFarm : ModelTask() {
                 Log.runtime(s)
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "recallAnimal err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "recallAnimal err:",t)
         }
     }
 
@@ -1453,8 +1441,7 @@ class AntFarm : ModelTask() {
                 }
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "sendBackAnimal err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "sendBackAnimal err:",t)
         }
     }
 
@@ -1506,8 +1493,7 @@ class AntFarm : ModelTask() {
                 Log.runtime(s)
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "receiveToolTaskReward err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "receiveToolTaskReward err:",t)
         }
     }
 
@@ -1525,8 +1511,7 @@ class AntFarm : ModelTask() {
                 Log.runtime(s)
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "harvestProduce err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "harvestProduce err:",t)
         }
     }
 
@@ -1566,8 +1551,7 @@ class AntFarm : ModelTask() {
                 Log.runtime(s)
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "donation err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "donation err:",t)
         }
     }
 
@@ -1818,8 +1802,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "recordFarmGame 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "recordFarmGame err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "recordFarmGame err:",t)
         }
     }
 
@@ -2199,8 +2182,7 @@ class AntFarm : ModelTask() {
                 Log.runtime(s)
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "useFarmTool err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "useFarmTool err:",t)
         }
         return false
     }
@@ -2366,8 +2348,7 @@ class AntFarm : ModelTask() {
             } while (hasNext)
             Log.record(TAG, "饲料剩余[" + foodStock + "g]")
         } catch (t: Throwable) {
-            Log.runtime(TAG, "notifyFriend err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "notifyFriend err:",t)
         }
     }
 
@@ -2488,8 +2469,7 @@ class AntFarm : ModelTask() {
             }
             animals = animalList.toTypedArray()
         } catch (t: Throwable) {
-            Log.runtime(TAG, "parseSyncAnimalStatusResponse err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "parseSyncAnimalStatusResponse err:",t)
         }
     }
 
@@ -2594,8 +2574,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "cook 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "cook err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "cook err:",t)
         }
     }
 
@@ -2618,8 +2597,7 @@ class AntFarm : ModelTask() {
                 }
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "useFarmFood err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "useFarmFood err:",t)
         }
     }
 
@@ -2651,8 +2629,7 @@ class AntFarm : ModelTask() {
                 }
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "drawLotteryPlus err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "drawLotteryPlus err:",t)
         }
     }
 
@@ -2684,8 +2661,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "visit 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "visit err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "visit err:",t)
         }
     }
 
@@ -2724,8 +2700,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "visitFriend 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "visitFriend err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "visitFriend err:",t)
         }
         return visitedTimes
     }
@@ -2738,8 +2713,7 @@ class AntFarm : ModelTask() {
                 Log.farm("收取麦子🌾[" + receiveFoodNum + "g]")
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "acceptGift err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "acceptGift err:",t)
         }
     }
 
@@ -2796,8 +2770,7 @@ class AntFarm : ModelTask() {
                 Log.runtime(jo.getString("resultDesc"), jo.toString())
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "queryChickenDiary err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "queryChickenDiary err:",t)
         }
     }
 
@@ -2826,8 +2799,7 @@ class AntFarm : ModelTask() {
                 Log.runtime(jo.getString("resultDesc"), jo.toString())
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "queryChickenDiary err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "queryChickenDiary err:",t)
         }
         return diaryDateStr
     }
@@ -2869,8 +2841,7 @@ class AntFarm : ModelTask() {
             throw e
         } catch (t: Throwable) {
             hasPreviousMore = false
-            Log.runtime(TAG, "queryChickenDiaryList err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "queryChickenDiaryList err:",t)
         }
         return hasPreviousMore
     }
@@ -2918,8 +2889,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "doChickenDiary 协程被取消")
             throw e
         } catch (e: Exception) {
-            Log.runtime(TAG, "doChickenDiary err:")
-            Log.printStackTrace(TAG, e)
+            Log.printStackTrace(TAG, "doChickenDiary err:",e)
         }
     }
 
@@ -2967,8 +2937,7 @@ class AntFarm : ModelTask() {
                 Log.runtime(jo.getString("resultDesc"), jo.toString())
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "visitAnimal err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "visitAnimal err:",t)
         }
     }
 
@@ -2987,8 +2956,7 @@ class AntFarm : ModelTask() {
                 Log.record(jsonObject.getString("memo"))
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "getAnimalCount err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "getAnimalCount err:",t)
             return
         }
         if (animals == null) {
@@ -3124,8 +3092,7 @@ class AntFarm : ModelTask() {
                 Log.record(TAG, "✅ 雇佣成功：共雇佣${hiredCount}只小鸡")
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "hireAnimal err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "hireAnimal err:",t)
         }
     }
 
@@ -3196,8 +3163,7 @@ class AntFarm : ModelTask() {
                 Log.record(jo.getString("memo"))
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "hireAnimal err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "hireAnimal err:",t)
         }
         return false
     }
@@ -3247,8 +3213,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "drawGameCenterAward 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "queryChickenDiaryList err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "queryChickenDiaryList err:",t)
         }
     }
 
@@ -3331,8 +3296,7 @@ class AntFarm : ModelTask() {
                 }
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "listOrnaments err: " + t.message)
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "listOrnaments err: " + t.message,t)
         }
     }
 
@@ -3398,8 +3362,7 @@ class AntFarm : ModelTask() {
                 }
             }
         } catch (e: JSONException) {
-            Log.runtime(TAG, "letsGetChickenFeedTogether err:")
-            Log.printStackTrace(e)
+            Log.printStackTrace(TAG, "letsGetChickenFeedTogether err:",e)
         }
     }
 
@@ -3696,11 +3659,9 @@ class AntFarm : ModelTask() {
                 familyDrawTask(familyUserIds, familyDrawInfo)
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "family err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "family err:",t)
         }
     }
-
 
     /**
      * 同步家庭亲密度状态
@@ -3716,8 +3677,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "syncFamilyStatusIntimacy 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "syncFamilyStatus err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "syncFamilyStatus err:",t)
         }
     }
 
@@ -3758,8 +3718,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "inviteFriendVisitFamily 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "inviteFriendVisitFamily err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "inviteFriendVisitFamily err:",t)
         }
     }
 
@@ -3814,8 +3773,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "familyBatchInviteP2PTask 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "familyBatchInviteP2PTask err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "familyBatchInviteP2PTask err:",t)
         }
     }
 
@@ -3870,8 +3828,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "familyDrawTask 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "familyDrawTask err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "familyDrawTask err:",t)
         }
     }
 
@@ -3882,8 +3839,7 @@ class AntFarm : ModelTask() {
                 Log.farm("亲密家庭🏠赠送扭蛋碎片#" + giftNum + "个#" + giftUserId)
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "giftFamilyDrawFragment err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "giftFamilyDrawFragment err:",t)
         }
     }
 
@@ -3894,8 +3850,7 @@ class AntFarm : ModelTask() {
                 return jo.getJSONArray("farmTaskList")
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "familyDrawListFarmTask err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "familyDrawListFarmTask err:",t)
         }
         return null
     }
@@ -3920,8 +3875,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "familyDraw 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "familyDraw err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "familyDraw err:",t)
         }
         return false
     }
@@ -3988,8 +3942,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "familyEatTogether 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "familyEatTogether err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "familyEatTogether err:",t)
         }
     }
 
@@ -4004,8 +3957,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "familyDrawSignReceiveFarmTaskAward 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "familyDrawSignReceiveFarmTaskAward err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "familyDrawSignReceiveFarmTaskAward err:",t)
         }
     }
 
@@ -4031,8 +3983,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "queryRecentFarmFood 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "queryRecentFarmFood err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "queryRecentFarmFood err:",t)
         }
         return null
     }
@@ -4072,8 +4023,7 @@ class AntFarm : ModelTask() {
             Log.debug(TAG, "familyFeedFriendAnimal 协程被取消")
             throw e
         } catch (t: Throwable) {
-            Log.runtime(TAG, "familyFeedFriendAnimal err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "familyFeedFriendAnimal err:",t)
         }
     }
 
@@ -4094,8 +4044,7 @@ class AntFarm : ModelTask() {
                 Log.farm("领取活动食物成功," + "已领取" + resultJson.optInt("foodCount"))
             }
         }  catch (e: Exception) {
-            Log.runtime(TAG, "clickForGiftV2 err:")
-            Log.printStackTrace(TAG, e)
+            Log.printStackTrace(TAG, "clickForGiftV2 err:",e)
         }
     }
 

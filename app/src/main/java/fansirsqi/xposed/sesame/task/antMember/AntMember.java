@@ -5,11 +5,13 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import fansirsqi.xposed.sesame.data.StatusFlags;
 import fansirsqi.xposed.sesame.entity.MemberBenefit;
+import fansirsqi.xposed.sesame.hook.SecurityBodyHelper;
 import fansirsqi.xposed.sesame.model.BaseModel;
 import fansirsqi.xposed.sesame.model.ModelFields;
 import fansirsqi.xposed.sesame.model.ModelGroup;
@@ -178,7 +180,7 @@ public class AntMember extends ModelTask {
 
       if (merchantSign.getValue() || merchantKmdk.getValue() || merchantMoreTask.getValue()) {
         JSONObject jo = new JSONObject(AntMemberRpcCall.transcodeCheck());
-        if (!jo.optBoolean("success")) {
+        if (!ResChecker.checkRes(TAG, jo)) {
           return;
         }
         JSONObject data = jo.getJSONObject("data");
@@ -230,7 +232,7 @@ public class AntMember extends ModelTask {
         return;
       }
 
-      if (!root.optBoolean("success")) {
+      if (!ResChecker.checkRes(TAG, root)) {
         Log.record(TAG + ".handleGrowthGuideTasks", "信誉任务列表获取失败: " + root.optString("resultView", resp));
         return;
       }
@@ -272,7 +274,7 @@ public class AntMember extends ModelTask {
 
           try {
             JSONObject openJo = new JSONObject(openResp);
-            if (openJo.optBoolean("success")) {
+            if (ResChecker.checkRes(TAG, openJo)) {
               Log.other(TAG, "信誉任务[领取成功] " + title);
             } else {
               Log.record(TAG + ".handleGrowthGuideTasks", "信誉任务[领取失败] behaviorId="
@@ -303,7 +305,7 @@ public class AntMember extends ModelTask {
               continue;
             }
 
-            if (!quizJo.optBoolean("success")) {
+            if (!ResChecker.checkRes(TAG, quizJo)) {
               Log.error(TAG + ".handleGrowthGuideTasks", "每日问答[查询失败] resp=" + quizResp);
               continue;
             }
@@ -349,7 +351,7 @@ public class AntMember extends ModelTask {
               continue;
             }
 
-            if (pushJo.optBoolean("success")) {
+            if (ResChecker.checkRes(TAG, pushJo)) {
               Log.other(TAG, "信誉任务[每日答题成功] " + questionContent
                       + " | 答案=" + answerContent + "(" + answerId + ")"
                       + (subTitle.isEmpty() ? "" : " | " + subTitle));
@@ -386,7 +388,7 @@ public class AntMember extends ModelTask {
             continue;   // 改为continue，避免return影响循环
           }
 
-          if (jo.optBoolean("success")) {
+          if (ResChecker.checkRes(TAG, jo)) {
             Log.other(TAG, "信誉任务[视频问答提交成功] → ");
           } else {
             Log.error(TAG + ".handleGrowthGuideTasks", "视频问答[提交失败] → " + pushResp);
@@ -397,11 +399,11 @@ public class AntMember extends ModelTask {
         if ("babanongchang_7d".equals(behaviorId) && "wait_doing".equals(status)) {
           try {
             // 假设getWua()方法存在，返回wua（为空即可）
-            String wua = ""; // 传入空字符串
+            String wua = SecurityBodyHelper.INSTANCE.getSecurityBodyData(4); // 传入空字符串
             String source = "DNHZ_NC_zhimajingnangSF"; // 从buttonUrl提取的source
-            Log.runtime(TAG, "set Wua " + wua);
+            Log.record(TAG, "set Wua " + wua);
 
-            String spreadManureDataStr = AntOrchardRpcCall.INSTANCE.orchardSpreadManure(wua, source);
+            String spreadManureDataStr = AntOrchardRpcCall.orchardSpreadManure(Objects.requireNonNull(wua), source);
             JSONObject spreadManureData;
             try {
               spreadManureData = new JSONObject(spreadManureDataStr);
@@ -467,7 +469,7 @@ public class AntMember extends ModelTask {
       JSONObject json = new JSONObject(queryResp);
 
       // 检查 success
-      if (!json.optBoolean("success", false)) return;
+      if (!ResChecker.checkRes(TAG, json)) return;
 
       JSONObject totalWait = json.optJSONObject("totalWaitProcessVO");
       if (totalWait == null) return;
@@ -933,7 +935,7 @@ public class AntMember extends ModelTask {
     try {
       String s = AntMemberRpcCall.queryHome();
       JSONObject jo = new JSONObject(s);
-      if (!jo.optBoolean("success")) {
+      if (!ResChecker.checkRes(TAG, jo)) {
         Log.other(TAG, "芝麻信用💳[首页响应失败]#" + jo.optString("errorMsg"));
         Log.error(TAG + ".checkSesameCanRun.queryHome", "芝麻信用💳[首页响应失败]#" + s);
         return false;
@@ -961,7 +963,7 @@ public class AntMember extends ModelTask {
       if (jo.has("resData")) {
         jo = jo.getJSONObject("resData");
       }
-      if (!jo.optBoolean("success")) {
+      if (!ResChecker.checkRes(TAG, jo)) {
         Log.other(TAG, "芝麻信用💳[查询任务响应失败]#" + jo.getString("resultCode"));
         Log.error(TAG + ".doAllAvailableSesameTask.queryAvailableSesameTask", "芝麻信用💳[查询任务响应失败]#" + s);
         return;
@@ -1117,7 +1119,7 @@ public class AntMember extends ModelTask {
         s = AntMemberRpcCall.joinSesameTask(taskTemplateId);
         GlobalThreadPools.sleepCompat(200);
         responseObj = new JSONObject(s);
-        if (!responseObj.optBoolean("success")) {
+        if (!ResChecker.checkRes(TAG, responseObj)) {
           Log.other(TAG, "芝麻信用💳[领取任务" + taskTitle + "失败]#" + s);
           skippedCount++;
           continue;
@@ -1137,7 +1139,7 @@ public class AntMember extends ModelTask {
         s = AntMemberRpcCall.finishSesameTask(recordId);
         GlobalThreadPools.sleepCompat(200);
         responseObj = new JSONObject(s);
-        if (responseObj.optBoolean("success")) {
+        if (ResChecker.checkRes(TAG, responseObj)) {
           Log.record(TAG, "芝麻信用💳[完成任务" + taskTitle + "]#(" + (j + 1) + "/" + needCompleteNum + "天)");
           taskCompleted = true;
         } else {
@@ -1166,7 +1168,7 @@ public class AntMember extends ModelTask {
 
       String checkInRes = AntMemberRpcCall.Zmxy.Alchemy.alchemyQueryCheckIn("zml");
       JSONObject checkInJo = new JSONObject(checkInRes);
-      if (checkInJo.optBoolean("success")) {
+      if (ResChecker.checkRes(TAG, checkInJo)) {
         JSONObject data = checkInJo.optJSONObject("data");
         if (data != null) {
           JSONObject currentDay = data.optJSONObject("currentDateCheckInTaskVO");
@@ -1178,7 +1180,7 @@ public class AntMember extends ModelTask {
               String completeRes = AntMemberRpcCall.zmCheckInCompleteTask(checkInDate, "zml");
               try {
                 JSONObject completeJo = new JSONObject(completeRes);
-                if (completeJo.optBoolean("success")) {
+                if (ResChecker.checkRes(TAG, completeJo)) {
                   JSONObject prize = completeJo.optJSONObject("data");
                   int num = prize != null ? prize.optInt("zmlNum",
                           prize.optJSONObject("prize") != null ?
@@ -1209,7 +1211,7 @@ public class AntMember extends ModelTask {
 
       JSONObject jo = new JSONObject(awardRes);
 
-      if (!jo.optBoolean("success", false)) {
+      if (!ResChecker.checkRes(TAG, jo)) {
         Log.error("芝麻炼金⚗️[次日奖励失败]：" + awardRes);
         // 即使失败也要设 flag，避免卡死重复调用
         Status.setFlagToday(StatusFlags.FLAG_ZMXY_ALCHEMY_NEXT_DAY_AWARD);
@@ -1255,7 +1257,7 @@ public class AntMember extends ModelTask {
     try {
       JSONObject jo = new JSONObject(AntMemberRpcCall.queryCreditFeedback());
       GlobalThreadPools.sleepCompat(500);
-      if (!jo.optBoolean("success")) {
+      if (!ResChecker.checkRes(TAG, jo)) {
         Log.other(TAG, "芝麻信用💳[查询未领取芝麻粒响应失败]#" + jo.getString("resultView"));
         Log.error(TAG + ".collectSesame.queryCreditFeedback", "芝麻信用💳[查询未领取芝麻粒响应失败]#" + jo);
         return;
@@ -1265,7 +1267,7 @@ public class AntMember extends ModelTask {
         GlobalThreadPools.sleepCompat(2000);
         jo = new JSONObject(AntMemberRpcCall.collectAllCreditFeedback());
         GlobalThreadPools.sleepCompat(2000);
-        if (!jo.optBoolean("success")) {
+        if (!ResChecker.checkRes(TAG, jo)) {
           Log.other(TAG, "芝麻信用💳[一键收取芝麻粒响应失败]#" + jo);
           Log.error(TAG + ".collectSesame.collectAllCreditFeedback", "芝麻信用💳[一键收取芝麻粒响应失败]#" + jo);
           return;
@@ -1282,7 +1284,7 @@ public class AntMember extends ModelTask {
         if (!withOneClick) {
           jo = new JSONObject(AntMemberRpcCall.collectCreditFeedback(creditFeedbackId));
           GlobalThreadPools.sleepCompat(2000);
-          if (!jo.optBoolean("success")) {
+          if (!ResChecker.checkRes(TAG, jo)) {
             Log.other(TAG, "芝麻信用💳[查询未领取芝麻粒响应失败]#" + jo.getString("resultView"));
             Log.error(TAG + ".collectSesame.collectCreditFeedback", "芝麻信用💳[收取芝麻粒响应失败]#" + jo);
             continue;
@@ -1302,11 +1304,11 @@ public class AntMember extends ModelTask {
     try {
       String s = AntMemberRpcCall.queryActivity();
       JSONObject jo = new JSONObject(s);
-      if (jo.optBoolean("success")) {
+      if (ResChecker.checkRes(TAG, jo)) {
         if ("SIGN_IN_ENABLE".equals(jo.getString("signInStatus"))) {
           String activityNo = jo.getString("activityNo");
           JSONObject joSignIn = new JSONObject(AntMemberRpcCall.signIn(activityNo));
-          if (joSignIn.optBoolean("success")) {
+          if (ResChecker.checkRes(TAG, joSignIn)) {
             Log.other(TAG,"商家服务🏬[开门打卡签到成功]");
           } else {
             Log.record(TAG,joSignIn.getString("errorMsg"));
@@ -1329,7 +1331,7 @@ public class AntMember extends ModelTask {
     try {
       for (int i = 0; i < 5; i++) {
         JSONObject jo = new JSONObject(AntMemberRpcCall.queryActivity());
-        if (jo.optBoolean("success")) {
+        if (ResChecker.checkRes(TAG, jo)) {
           String activityNo = jo.getString("activityNo");
           if (!TimeUtil.getFormatDate().replace("-", "").equals(activityNo.split("_")[2])) {
             break;
@@ -1340,7 +1342,7 @@ public class AntMember extends ModelTask {
           if ("UN_SIGN_UP".equals(jo.getString("signUpStatus"))) {
             String activityPeriodName = jo.getString("activityPeriodName");
             JSONObject joSignUp = new JSONObject(AntMemberRpcCall.signUp(activityNo));
-            if (joSignUp.optBoolean("success")) {
+            if (ResChecker.checkRes(TAG, joSignUp)) {
               Log.other(TAG,"商家服务🏬[" + activityPeriodName + "开门打卡报名]");
               return;
             } else {
@@ -1366,7 +1368,7 @@ public class AntMember extends ModelTask {
     try {
       String s = AntMemberRpcCall.merchantSign();
       JSONObject jo = new JSONObject(s);
-      if (!jo.optBoolean("success")) {
+      if (!ResChecker.checkRes(TAG, jo)) {
         Log.runtime(TAG, "doMerchantSign err:" + s);
         return;
       }
@@ -1393,7 +1395,7 @@ public class AntMember extends ModelTask {
     try {
       boolean doubleCheck = false;
       JSONObject jo = new JSONObject(s);
-      if (jo.optBoolean("success")) {
+      if (ResChecker.checkRes(TAG, jo)) {
         JSONArray taskList = jo.getJSONObject("data").getJSONArray("taskList");
         for (int i = 0; i < taskList.length(); i++) {
           JSONObject task = taskList.getJSONObject(i);
@@ -1406,7 +1408,7 @@ public class AntMember extends ModelTask {
           if ("NEED_RECEIVE".equals(taskStatus)) {
             if (task.has("pointBallId")) {
               jo = new JSONObject(AntMemberRpcCall.ballReceive(task.getString("pointBallId")));
-              if (jo.optBoolean("success")) {
+              if (ResChecker.checkRes(TAG, jo)) {
                 Log.other("商家服务🏬[" + title + "]#领取积分" + reward);
               }
             }
@@ -1414,7 +1416,7 @@ public class AntMember extends ModelTask {
             if (task.has("extendLog")) {
               JSONObject bizExtMap = task.getJSONObject("extendLog").getJSONObject("bizExtMap");
               jo = new JSONObject(AntMemberRpcCall.taskFinish(bizExtMap.getString("bizId")));
-              if (jo.optBoolean("success")) {
+              if (ResChecker.checkRes(TAG, jo)) {
                 Log.other("商家服务🏬[" + title + "]#领取积分" + reward);
               }
               doubleCheck = true;
@@ -1493,13 +1495,13 @@ public class AntMember extends ModelTask {
     try {
       String s = AntMemberRpcCall.taskReceive(taskCode);
       JSONObject jo = new JSONObject(s);
-      if (jo.optBoolean("success")) {
+      if (ResChecker.checkRes(TAG, jo)) {
         GlobalThreadPools.sleepCompat(500);
         jo = new JSONObject(AntMemberRpcCall.actioncode(actionCode));
-        if (jo.optBoolean("success")) {
+        if (ResChecker.checkRes(TAG, jo)) {
           GlobalThreadPools.sleepCompat(16000);
           jo = new JSONObject(AntMemberRpcCall.produce(actionCode));
-          if (jo.optBoolean("success")) {
+          if (ResChecker.checkRes(TAG, jo)) {
             Log.other("商家服务🏬[完成任务" + title + "]");
           }
         }
@@ -1520,7 +1522,7 @@ public class AntMember extends ModelTask {
       String s = AntMemberRpcCall.queryAvailableCollectInsuredGold();
       GlobalThreadPools.sleepCompat(200);
       JSONObject jo = new JSONObject(s);
-      if (!jo.optBoolean("success")) {
+      if (!ResChecker.checkRes(TAG, jo)) {
         Log.other(TAG + ".collectInsuredGold.queryInsuredHome", "保障金🏥[响应失败]#" + s);
         return;
       }
@@ -1531,7 +1533,7 @@ public class AntMember extends ModelTask {
         s = AntMemberRpcCall.collectInsuredGold(signInBall);
         GlobalThreadPools.sleepCompat(2000);
         jo = new JSONObject(s);
-        if (!jo.optBoolean("success")) {
+        if (!ResChecker.checkRes(TAG, jo)) {
           Log.other(TAG + ".collectInsuredGold.collectInsuredGold", "保障金🏥[响应失败]#" + s);
           return;
         }
@@ -1543,7 +1545,7 @@ public class AntMember extends ModelTask {
         s = AntMemberRpcCall.collectInsuredGold(anotherBall);
         GlobalThreadPools.sleepCompat(2000);
         jo = new JSONObject(s);
-        if (!jo.optBoolean("success")) {
+        if (!ResChecker.checkRes(TAG, jo)) {
           Log.other(TAG + ".collectInsuredGold.collectInsuredGold", "保障金🏥[响应失败]#" + s);
           return;
         }
@@ -1760,7 +1762,7 @@ public class AntMember extends ModelTask {
       try {
         String resp = AntMemberRpcCall.querySignInBall();
         JSONObject root = new JSONObject(resp);
-        if (!root.optBoolean("success")) {
+        if (!ResChecker.checkRes(TAG, root)) {
           String msg = root.optString("errorMsg", root.optString("resultView", resp));
           Log.record(TAG + ".enableGameCenter.signIn", "游戏中心🎮[签到查询失败]#" + msg);
         } else {
@@ -1779,7 +1781,7 @@ public class AntMember extends ModelTask {
             String signResp = AntMemberRpcCall.continueSignIn();
             GlobalThreadPools.sleepCompat(300);
             JSONObject signJo = new JSONObject(signResp);
-            if (!signJo.optBoolean("success")) {
+            if (!ResChecker.checkRes(TAG, signJo)) {
               String msg = signJo.optString("errorMsg", signJo.optString("resultView", signResp));
               Log.record(TAG + ".enableGameCenter.signIn", "游戏中心🎮[签到失败]#" + msg);
             } else {
@@ -1831,7 +1833,7 @@ public class AntMember extends ModelTask {
       try {
         String resp = AntMemberRpcCall.queryGameCenterTaskList();
         JSONObject root = new JSONObject(resp);
-        if (!root.optBoolean("success")) {
+        if (!ResChecker.checkRes(TAG, root)) {
           String msg = root.optString("errorMsg", root.optString("resultView", resp));
           Log.record(TAG + ".enableGameCenter.tasks", "游戏中心🎮[任务列表查询失败]#" + msg);
         } else {
@@ -1885,7 +1887,7 @@ public class AntMember extends ModelTask {
                       String signUpResp = AntMemberRpcCall.doTaskSignup(taskId);
                       GlobalThreadPools.sleepCompat(300);
                       JSONObject signUpJo = new JSONObject(signUpResp);
-                      if (!signUpJo.optBoolean("success")) {
+                      if (!ResChecker.checkRes(TAG, signUpJo)) {
                         String msg = signUpJo.optString("errorMsg", signUpJo.optString("resultView", signUpResp));
                         Log.record(TAG + ".enableGameCenter.tasks", "游戏中心🎮任务[" + title + "]报名失败#" + msg);
                         failed++;
@@ -1898,7 +1900,7 @@ public class AntMember extends ModelTask {
                     GlobalThreadPools.sleepCompat(300);
                     JSONObject doJo = new JSONObject(doResp);
 
-                    if (doJo.optBoolean("success")) {
+                    if (ResChecker.checkRes(TAG, doJo)) {
                       // 检查返回的任务状态
                       JSONObject doData = doJo.optJSONObject("data");
                       String resultStatus = doData != null ? doData.optString("taskStatus", "") : "";
@@ -1949,7 +1951,7 @@ public class AntMember extends ModelTask {
       try {
         String resp = AntMemberRpcCall.queryPointBallList();
         JSONObject root = new JSONObject(resp);
-        if (!root.optBoolean("success")) {
+        if (!ResChecker.checkRes(TAG, root)) {
           String msg = root.optString("errorMsg", root.optString("resultView", resp));
           Log.record(TAG + ".enableGameCenter.point", "游戏中心🎮[查询待收乐豆失败]#" + msg);
         } else {
@@ -1961,7 +1963,7 @@ public class AntMember extends ModelTask {
             String batchResp = AntMemberRpcCall.batchReceivePointBall();
             GlobalThreadPools.sleepCompat(300);
             JSONObject batchJo = new JSONObject(batchResp);
-            if (batchJo.optBoolean("success")) {
+            if (ResChecker.checkRes(TAG, batchJo)) {
               JSONObject batchData = batchJo.optJSONObject("data");
               int receiveAmount = batchData != null ? batchData.optInt("receiveAmount", 0) : 0;
               int totalAmount = batchData != null ? batchData.optInt("totalAmount", receiveAmount) : receiveAmount;
@@ -1992,7 +1994,7 @@ public class AntMember extends ModelTask {
         String signInProcessStr = AntMemberRpcCall.querySignInProcess("AP16242232", "INS_BLUE_BEAN_SIGN");
 
         JSONObject jo = new JSONObject(signInProcessStr);
-        if (!jo.optBoolean("success")) {
+        if (!ResChecker.checkRes(TAG, jo)) {
           Log.runtime(jo.toString());
           return;
         }
@@ -2001,7 +2003,7 @@ public class AntMember extends ModelTask {
           String signInTriggerStr = AntMemberRpcCall.signInTrigger("AP16242232", "INS_BLUE_BEAN_SIGN");
 
           jo = new JSONObject(signInTriggerStr);
-          if (jo.optBoolean("success")) {
+          if (ResChecker.checkRes(TAG, jo)) {
             String prizeName = jo.getJSONObject("result").getJSONArray("prizeSendOrderDTOList").getJSONObject(0).getString("prizeName");
             Log.record(TAG,"安心豆🫘[" + prizeName + "]");
           } else {
@@ -2025,7 +2027,7 @@ public class AntMember extends ModelTask {
         String accountInfo = AntMemberRpcCall.queryUserAccountInfo("INS_BLUE_BEAN");
 
         JSONObject jo = new JSONObject(accountInfo);
-        if (!jo.optBoolean("success")) {
+        if (!ResChecker.checkRes(TAG, jo)) {
           Log.runtime(jo.toString());
           return;
         }
@@ -2036,7 +2038,7 @@ public class AntMember extends ModelTask {
         String exchangeDetailStr = AntMemberRpcCall.beanExchangeDetail("IT20230214000700069722");
 
         jo = new JSONObject(exchangeDetailStr);
-        if (!jo.optBoolean("success")) {
+        if (!ResChecker.checkRes(TAG, jo)) {
           Log.runtime(jo.toString());
           return;
         }
@@ -2054,7 +2056,7 @@ public class AntMember extends ModelTask {
         String exchangeResult = AntMemberRpcCall.beanExchange(itemId, realConsumePointAmount);
 
         jo = new JSONObject(exchangeResult);
-        if (jo.optBoolean("success")) {
+        if (ResChecker.checkRes(TAG, jo)) {
           Log.record(TAG,"安心豆🫘[兑换:" + itemName + "]");
         } else {
           Log.runtime(jo.toString());
@@ -2079,7 +2081,7 @@ public class AntMember extends ModelTask {
       // ================= Step 1: 自动炼金 (消耗芝麻粒升级) =================
       String homeRes = AntMemberRpcCall.Zmxy.Alchemy.alchemyQueryHome();
       JSONObject homeJo = new JSONObject(homeRes);
-      if (homeJo.optBoolean("success")) {
+      if (ResChecker.checkRes(TAG, homeJo)) {
         JSONObject data = homeJo.optJSONObject("data");
         if (data != null) {
           int zmlBalance = data.optInt("zmlBalance", 0);      // 当前芝麻粒
@@ -2093,7 +2095,7 @@ public class AntMember extends ModelTask {
             String alchemyRes = AntMemberRpcCall.Zmxy.Alchemy.alchemyExecute();
             JSONObject alchemyJo = new JSONObject(alchemyRes);
 
-            if (alchemyJo.optBoolean("success")) {
+            if (ResChecker.checkRes(TAG, alchemyJo)) {
               JSONObject alData = alchemyJo.optJSONObject("data");
               if (alData != null) {
                 boolean levelUp = alData.optBoolean("levelUp", false);
@@ -2129,7 +2131,7 @@ public class AntMember extends ModelTask {
       // ================= Step 2: 自动签到 & 时段奖励 =================
       String checkInRes = AntMemberRpcCall.Zmxy.Alchemy.alchemyQueryCheckIn("alchemy");
       JSONObject checkInJo = new JSONObject(checkInRes);
-      if (checkInJo.optBoolean("success")) {
+      if (ResChecker.checkRes(TAG, checkInJo)) {
         JSONObject data = checkInJo.optJSONObject("data");
         if (data != null) {
           JSONObject currentDay = data.optJSONObject("currentDateCheckInTaskVO");
@@ -2141,7 +2143,7 @@ public class AntMember extends ModelTask {
               String completeRes = AntMemberRpcCall.zmCheckInCompleteTask(checkInDate, "alchemy");
               try {
                 JSONObject completeJo = new JSONObject(completeRes);
-                if (completeJo.optBoolean("success")) {
+                if (ResChecker.checkRes(TAG, completeJo)) {
                   JSONObject prize = completeJo.optJSONObject("data");
                   int num = prize != null ? prize.optInt("zmlNum",
                           prize.optJSONObject("prize") != null ?
@@ -2164,7 +2166,7 @@ public class AntMember extends ModelTask {
 
       JSONObject queryResp = new JSONObject(queryRespStr);
       if (!ResChecker.checkRes(TAG + "查询时段任务失败:", queryResp)
-              || !queryResp.optBoolean("success", false)
+              || !ResChecker.checkRes(TAG, queryResp)
               || queryResp.optJSONObject("data") == null) {
         Log.error(TAG, "芝麻炼金⚗️[检查时段奖励错误] alchemyQueryTimeLimitedTask raw=" + queryResp);
         return;
@@ -2198,7 +2200,7 @@ public class AntMember extends ModelTask {
         String collectRespStr = AntMemberRpcCall.Zmxy.Alchemy.alchemyCompleteTimeLimitedTask(templateId);
         JSONObject collectResp = new JSONObject(collectRespStr);
 
-        if (!collectResp.optBoolean("success", false) || collectResp.optJSONObject("data") == null) {
+        if (!ResChecker.checkRes(TAG, collectResp) || collectResp.optJSONObject("data") == null) {
           Log.error(TAG, "领取任务奖励失败 raw=" + collectResp);
         } else {
           JSONObject data = collectResp.getJSONObject("data");
@@ -2210,12 +2212,13 @@ public class AntMember extends ModelTask {
         Log.record(TAG, "芝麻炼金⚗️[当前不可领取] 任务=" + taskName);
       }
 
+
       // ================= Step 3: 自动做任务 =================
       Log.record(TAG, "芝麻炼金⚗️[开始扫描任务列表]");
       String listRes = AntMemberRpcCall.Zmxy.Alchemy.alchemyQueryListV3();
       JSONObject listJo = new JSONObject(listRes);
 
-      if (listJo.optBoolean("success")) {
+      if (ResChecker.checkRes(TAG, listJo)) {
         JSONObject data = listJo.optJSONObject("data");
         if (data != null) {
           JSONArray toComplete = data.optJSONArray("toCompleteVOS");
@@ -2237,7 +2240,7 @@ public class AntMember extends ModelTask {
       // 4.1 查询是否有可收取的芝麻粒
       String queryFeedbackRes = AntMemberRpcCall.queryCreditFeedback();
       JSONObject feedbackJo = new JSONObject(queryFeedbackRes);
-      if (feedbackJo.optBoolean("success")) {
+      if (ResChecker.checkRes(TAG, feedbackJo)) {
         JSONArray feedbackList = feedbackJo.optJSONArray("creditFeedbackVOS");
         if (feedbackList != null && feedbackList.length() > 0) {
           Log.record(TAG, "芝麻炼金⚗️[发现" + feedbackList.length() + "个待收取项，执行一键收取]");
@@ -2245,7 +2248,7 @@ public class AntMember extends ModelTask {
           // 4.2 执行一键收取
           String collectRes = AntMemberRpcCall.collectAllCreditFeedback();
           JSONObject collectJo = new JSONObject(collectRes);
-          if (collectJo.optBoolean("success")) {
+          if (ResChecker.checkRes(TAG, collectJo)) {
             Log.other("芝麻炼金⚗️[一键收取成功]#收割完毕");
           } else {
             Log.record(TAG, "芝麻炼金⚗️[一键收取失败]#" + collectJo.optString("resultView"));
@@ -2324,7 +2327,7 @@ public class AntMember extends ModelTask {
           String adFinishRes = AntMemberRpcCall.taskFinish(bizId);
           JSONObject adFinishJo = new JSONObject(adFinishRes);
           // 兼容返回中只有 errCode=0 的情况
-          if (adFinishJo.optBoolean("success") || "0".equals(adFinishJo.optString("errCode"))) {
+          if (ResChecker.checkRes(TAG, adFinishJo) || "0".equals(adFinishJo.optString("errCode"))) {
             int reward = task.optInt("rewardAmount", 0);
             Log.other("芝麻炼金⚗️[广告任务完成: " + title + "]#获得" + reward + "粒");
           } else {
@@ -2360,7 +2363,7 @@ public class AntMember extends ModelTask {
         }
         String joinRes = AntMemberRpcCall.joinSesameTask(templateId);
         JSONObject joinJo = new JSONObject(joinRes);
-        if (joinJo.optBoolean("success")) {
+        if (ResChecker.checkRes(TAG, joinJo)) {
           JSONObject joinData = joinJo.optJSONObject("data");
           if (joinData != null) {
             recordId = joinData.optString("recordId");
@@ -2384,7 +2387,7 @@ public class AntMember extends ModelTask {
       if (!recordId.isEmpty()) {
         String finishRes = AntMemberRpcCall.finishSesameTask(recordId);
         JSONObject finishJo = new JSONObject(finishRes);
-        if (finishJo.optBoolean("success")) {
+        if (ResChecker.checkRes(TAG, finishJo)) {
           int reward = task.optInt("rewardAmount", 0);
           Log.other("芝麻炼金⚗️[任务完成: " + title + "]#获得" + reward + "粒");
         } else {

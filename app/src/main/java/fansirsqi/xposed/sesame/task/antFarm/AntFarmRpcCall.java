@@ -101,8 +101,6 @@ public class AntFarmRpcCall {
         return RequestManager.requestString("com.alipay.antfarm.wakeUp", args1);
     }
 
-
-
     public static String rewardFriend(String consistencyKey, String friendId, String productNum, String time) {
         String args1 = "[{\"canMock\":true,\"consistencyKey\":\"" + consistencyKey
                 + "\",\"friendId\":\"" + friendId + "\",\"operType\":\"1\",\"productNum\":" + productNum +
@@ -607,7 +605,6 @@ public class AntFarmRpcCall {
         return RequestManager.requestString("com.alipay.antfarm.OpenPrivatePolicy", params);
     }
 
-
     public static String deliverContentExpand(
             String ariverRpcTraceId,
             String eventId,
@@ -756,8 +753,6 @@ public class AntFarmRpcCall {
         return RequestManager.requestString("com.alipay.antfarm.clickForGiftV2", data);
     }
 
-
-
     /**
      * 查询抽抽乐活动信息
      *
@@ -856,7 +851,6 @@ public class AntFarmRpcCall {
                         + "\"source\":\"icon\"}]"
         );
     }
-
 
     /**
      * 执行抽奖（IP抽抽乐）

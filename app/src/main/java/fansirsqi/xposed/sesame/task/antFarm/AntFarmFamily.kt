@@ -252,8 +252,7 @@ data object AntFarmFamily {
             }
 
         } catch (t: Throwable) {
-            Log.runtime(TAG, "familyFeedFriendAnimal err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "familyFeedFriendAnimal err:",t)
         }
     }
 
@@ -320,8 +319,7 @@ data object AntFarmFamily {
                 Log.farm("家庭任务🏠请客" + periodName + "#消耗美食" + familyUserIds.size + "份")
             }
         } catch (t: Throwable) {
-            Log.runtime(TAG, "familyEatTogether err:")
-            Log.printStackTrace(TAG, t)
+            Log.printStackTrace(TAG, "familyEatTogether err:",t)
         }
     }
 

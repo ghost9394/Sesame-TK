@@ -206,8 +206,7 @@ public class AntStall extends ModelTask {
                 Log.record(TAG,"home err:" + " " + s);
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "home err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG,"home err:",t);
         }finally {
             Log.record(TAG,"执行结束-" + getName());
         }
@@ -235,8 +234,7 @@ public class AntStall extends ModelTask {
                 Log.record(TAG,"sendBackPre err:" + " " + s);
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "sendBack err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG,"sendBack err:",t);
         }
     }
     private void inviteOpen(String seatId, Set<String> sentUserId) {

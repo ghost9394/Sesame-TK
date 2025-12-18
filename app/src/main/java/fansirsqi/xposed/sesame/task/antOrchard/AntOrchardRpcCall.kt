@@ -68,6 +68,7 @@ object AntOrchardRpcCall {
      * @param wua 用户标识
      * @param source 来源标识，可自定义
      */
+    @JvmStatic  // 重点：让 Java 能直接用类名调用
     fun orchardSpreadManure(wua: String, source: String): String {
         return RequestManager.requestString(
             "com.alipay.antfarm.orchardSpreadManure",
