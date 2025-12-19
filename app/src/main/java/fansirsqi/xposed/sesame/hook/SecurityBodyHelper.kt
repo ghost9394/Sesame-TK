@@ -3,7 +3,6 @@ package fansirsqi.xposed.sesame.hook
 import de.robv.android.xposed.XposedHelpers
 import fansirsqi.xposed.sesame.hook.ApplicationHook.getAppContext
 import fansirsqi.xposed.sesame.util.Log
-import java.lang.ClassLoader
 
 /**
  * 安全组件数据获取助手类
@@ -84,8 +83,7 @@ object SecurityBodyHelper {
                 null
             }
         } catch (e: Throwable) {
-            Log.error(TAG, "获取安全组件数据失败: ${e.message}")
-            Log.printStackTrace(TAG, e)
+            Log.printStackTrace(TAG, "获取安全组件数据失败: ${e.message}",e)
             return null
         }
     }

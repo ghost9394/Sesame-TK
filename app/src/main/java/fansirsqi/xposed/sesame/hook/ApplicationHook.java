@@ -462,6 +462,7 @@ public class ApplicationHook {
 
     @SuppressLint("PrivateApi")
     private void handleHookLogic(ClassLoader classLoader, String packageName, String apkPath, Object rawParam) {
+        DataStore.INSTANCE.init(Files.CONFIG_DIR);
         XposedBridge.log(TAG + "|handleHookLogic " + packageName + " scuess!");
         if (hooked) return;
         hooked = true;
@@ -524,10 +525,6 @@ public class ApplicationHook {
                                 alipayVersion = new AlipayVersion(pInfo.versionName);
                                 Log.runtime(TAG, "📦 支付宝版本(回退): " + pInfo.versionName);
 
-                                // 特殊版本处理
-                                if (pInfo.versionName.equals("10.7.26.8100")) {
-                                    HookUtil.INSTANCE.fuckAccounLimit(classLoader);
-                                }
                             } else {
                                 Log.runtime(TAG, "⚠️ 无法获取版本信息");
                                 alipayVersion = new AlipayVersion(""); // 空版本
@@ -590,7 +587,7 @@ public class ApplicationHook {
                                 Log.runtime(TAG, "initHandler success");
                                 return;
                             }
-                            String currentUid = UserMap.getCurrentUid();
+                            String currentUid = UserMap.INSTANCE.getCurrentUid();
                             Log.runtime(TAG, "onResume currentUid: " + currentUid);
                             if (!targetUid.equals(currentUid)) {
                                 if (currentUid != null) {
@@ -685,7 +682,7 @@ public class ApplicationHook {
                                         SchedulerAdapter.scheduleDelayedExecution(BaseModel.Companion.getCheckInterval().getValue());
                                         return;
                                     }
-                                    String currentUid = UserMap.getCurrentUid();
+                                    String currentUid = UserMap.INSTANCE.getCurrentUid();
                                     String targetUid = HookUtil.INSTANCE.getUserId(classLoader);
                                     if (targetUid == null || !targetUid.equals(currentUid)) {
                                         Log.record(TAG, "用户切换或为空，重新登录");
@@ -921,7 +918,7 @@ public class ApplicationHook {
                             }
 
                             // 取得当前用户 UID
-                            String userId = UserMap.getCurrentUid();
+                            String userId = UserMap.INSTANCE.getCurrentUid();
                             if (userId == null || userId.isEmpty()) {
                                 Log.error("VIPHook", "无法保存 referToken：当前用户ID为空");
                                 return Unit.INSTANCE;
@@ -966,7 +963,7 @@ public class ApplicationHook {
 
                 Model.bootAllModel(classLoader);
                 Status.load(userId);
-                DataStore.INSTANCE.init(Files.CONFIG_DIR);
+
                 updateDay();
                 String successMsg = "芝麻粒-TK 加载成功✨";
                 Log.record(successMsg);

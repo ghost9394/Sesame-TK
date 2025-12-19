@@ -31,7 +31,7 @@ object AntCooperateRpcCall {
     }
 
     @JvmStatic
-    fun cooperateWater(uid: String, coopId: String, count: Int): String {
+    fun cooperateWater(uid: String?, coopId: String, count: Int): String {
         val args = "[{\"bizNo\":\"" + uid + "_" + coopId + "_" + System.currentTimeMillis() +
                 "\",\"cooperationId\":\"" + coopId + "\",\"energyCount\":" + count +
                 ",\"source\":\"\",\"version\":\"" + VERSION + "\"}]"

@@ -158,7 +158,7 @@ public class AntDodo extends ModelTask {
                             Log.forest("神奇物种🦕[" + ecosystem + "]#" + name);
                             if (!set.isEmpty()) {
                                 for (String userId : set) {
-                                    if (!UserMap.getCurrentUid().equals(userId)) {
+                                    if (!UserMap.INSTANCE.getCurrentUid().equals(userId)) {
                                         int fantasticStarQuantity = animal.optInt("fantasticStarQuantity", 0);
                                         if (fantasticStarQuantity == 3) {
                                             sendCard(animal, userId);
@@ -174,7 +174,7 @@ public class AntDodo extends ModelTask {
                 }
                 if (!set.isEmpty()) {
                     for (String userId : set) {
-                        if (!UserMap.getCurrentUid().equals(userId)) {
+                        if (!UserMap.INSTANCE.getCurrentUid().equals(userId)) {
                             sendAntDodoCard(bookId, userId);
                             break;
                         }
@@ -301,7 +301,7 @@ public class AntDodo extends ModelTask {
                             Log.forest("使用道具🎭[" + propName + "]#" + ecosystem + "-" + name);
                             Set<String> map = sendFriendCard.getValue();
                             for (String userId : map) {
-                                if (!UserMap.getCurrentUid().equals(userId)) {
+                                if (!Objects.equals(UserMap.INSTANCE.getCurrentUid(), userId)) {
                                     int fantasticStarQuantity = animal.optInt("fantasticStarQuantity", 0);
                                     if (fantasticStarQuantity == 3) {
                                         sendCard(animal, userId);

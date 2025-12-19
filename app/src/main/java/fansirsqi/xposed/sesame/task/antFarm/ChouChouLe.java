@@ -49,7 +49,7 @@ public class ChouChouLe {
      */
     void chouchoule() {
         try {
-            String response = AntFarmRpcCall.queryLoveCabin(UserMap.getCurrentUid());
+            String response = AntFarmRpcCall.queryLoveCabin(UserMap.INSTANCE.getCurrentUid());
             JSONObject jo = new JSONObject(response);
             if (!ResChecker.checkRes(TAG, jo)) {
                 return;

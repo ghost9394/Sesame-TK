@@ -36,6 +36,7 @@ import fansirsqi.xposed.sesame.model.SelectModelFieldFunc
 import fansirsqi.xposed.sesame.newui.DeviceInfoCard
 import fansirsqi.xposed.sesame.newui.DeviceInfoUtil
 import fansirsqi.xposed.sesame.newui.WatermarkView
+import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.ui.widget.ListDialog
 import fansirsqi.xposed.sesame.util.AssetUtil
 import fansirsqi.xposed.sesame.util.Detector
@@ -58,6 +59,7 @@ class MainActivity : BaseActivity() {
     private val TAG = "MainActivity"
     private var hasPermissions = false
     private var userNameArray = arrayOf<String>()
+
     private var userEntityArray = arrayOf<UserEntity?>(null)
     private lateinit var oneWord: TextView
 
@@ -104,6 +106,7 @@ class MainActivity : BaseActivity() {
             val result = FansirsqiUtil.getOneWord()
             oneWord.text = result
         }
+
     }
 
     override fun onResume() {
@@ -117,22 +120,18 @@ class MainActivity : BaseActivity() {
             try {
                 val userNameList: MutableList<String> = ArrayList()
                 val userEntityList: MutableList<UserEntity?> = ArrayList()
-                val configFiles = Files.CONFIG_DIR.listFiles()
-                if (configFiles != null) {
-                    for (configDir in configFiles) {
-                        if (configDir.isDirectory) {
-                            val userId = configDir.name
-                            UserMap.loadSelf(userId)
-                            val userEntity = UserMap.get(userId)
-                            val userName = if (userEntity == null) {
-                                userId
-                            } else {
-                                userEntity.showName + ": " + userEntity.account
-                            }
-                            userNameList.add(userName)
-                            userEntityList.add(userEntity)
-                        }
+                val configFiles = FansirsqiUtil.getFolderList(Files.CONFIG_DIR.absolutePath)
+                for (userId in configFiles) {
+                    UserMap.loadSelf(userId)
+                    Log.runtime(TAG, "userId: $userId")
+                    val userEntity = UserMap.get(userId)
+                    val userName = if (userEntity == null) {
+                        userId
+                    } else {
+                        userEntity.showName + ": " + userEntity.account
                     }
+                    userNameList.add(userName)
+                    userEntityList.add(userEntity)
                 }
                 userNameArray = userNameList.toTypedArray()
                 userEntityArray = userEntityList.toTypedArray()
@@ -141,13 +140,15 @@ class MainActivity : BaseActivity() {
                 Log.printStackTrace(e)
             }
         }
-
         Log.runtime(TAG, "isModuleActivated: ${ServiceManager.isModuleActivated}")
+        val activedUser = DataStore.get("activedUser", UserEntity::class.java)
         if (ServiceManager.isModuleActivated) {
-            updateSubTitle(RunType.ACTIVE.nickName)
+            updateSubTitle(RunType.ACTIVE.nickName, activedUser)
         } else {
-            updateSubTitle(RunType.LOADED.nickName)
+            updateSubTitle(RunType.LOADED.nickName, activedUser)
         }
+
+
     }
 
 
@@ -462,8 +463,6 @@ class MainActivity : BaseActivity() {
                 false,
                 ListDialog.ListType.SHOW
             )
-        } else {
-            ToastUtil.makeText(this, "😡 别他妈选默认！！！！！！！！", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -487,8 +486,9 @@ class MainActivity : BaseActivity() {
     }
 
 
-    fun updateSubTitle(runType: String) {
+    fun updateSubTitle(runType: String = RunType.LOADED.nickName, currentUserEntity: UserEntity?) {
         baseTitle = ViewAppInfo.appTitle + "[" + runType + "]"
+        baseSubtitle = "当前载入: ${currentUserEntity?.showName ?: "未载入^o^ 重启支付宝看看👀"}"
         when (runType) {
             RunType.DISABLE.nickName -> setBaseTitleTextColor(ContextCompat.getColor(this, R.color.not_active_text))
             RunType.ACTIVE.nickName -> setBaseTitleTextColor(ContextCompat.getColor(this, R.color.active_text))
@@ -497,12 +497,12 @@ class MainActivity : BaseActivity() {
     }
 
     /**
-    * 执行需要验证的操作（带开关控制）
-    *
-    * @param action 需要执行的操作
-    *
-    * @details 根据 BuildConfig 配置决定是否需要密码验证
-    */
+     * 执行需要验证的操作（带开关控制）
+     *
+     * @param action 需要执行的操作
+     *
+     * @details 根据 BuildConfig 配置决定是否需要密码验证
+     */
     private fun executeWithVerification(action: () -> Unit) {
         if (BuildConfig.DEBUG) {
             action()// 不需要验证时直接执行
@@ -512,6 +512,7 @@ class MainActivity : BaseActivity() {
             showPasswordDialog(action)
         }
     }
+
     @SuppressLint("SetTextI18n")
     private fun showPasswordDialog(onSuccess: () -> Unit) {
         // 父布局

@@ -228,7 +228,7 @@ public class AntSports extends ModelTask {
             }
 
             if (minExchangeCount.getValue() > 0
-                    && Status.canExchangeToday(UserMap.getCurrentUid())) {
+                    && Status.canExchangeToday(UserMap.INSTANCE.getCurrentUid())) {
                 queryWalkStep(loader);
             }
 
@@ -1036,7 +1036,7 @@ public class AntSports extends ModelTask {
                     JSONObject walkDonateHomeModel = jo.getJSONObject("walkDonateHomeModel");
                     JSONObject walkUserInfoModel = walkDonateHomeModel.getJSONObject("walkUserInfoModel");
                     if (!walkUserInfoModel.has("exchangeFlag")) {
-                        Status.exchangeToday(UserMap.getCurrentUid());
+                        Status.exchangeToday(UserMap.INSTANCE.getCurrentUid());
                         return;
                     }
                     String donateToken = walkDonateHomeModel.getString("donateToken");
@@ -1049,9 +1049,9 @@ public class AntSports extends ModelTask {
                         int userCount = donateExchangeResultModel.getInt("userCount");
                         double amount = donateExchangeResultModel.getJSONObject("userAmount").getDouble("amount");
                         Log.other(TAG, "捐出活动❤️[" + userCount + "步]#兑换" + amount + "元公益金");
-                        Status.exchangeToday(UserMap.getCurrentUid());
+                        Status.exchangeToday(UserMap.INSTANCE.getCurrentUid());
                     } else if (s.contains("已捐步")) {
-                        Status.exchangeToday(UserMap.getCurrentUid());
+                        Status.exchangeToday(UserMap.INSTANCE.getCurrentUid());
                     } else {
                         Log.runtime(TAG, jo.getString("resultDesc"));
                     }

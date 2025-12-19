@@ -25,8 +25,8 @@ object WhackMole {
     private const val SOURCE = "senlinguangchangdadishu"
     
     // ========== 核心配置 ==========
-    /** 一次性启动的游戏局数：10局并发 */
-    private const val TOTAL_GAMES = 10
+    /** 一次性启动的游戏局数：5局并发 */
+    private const val TOTAL_GAMES = 5
     
     /** 游戏总时长（毫秒）：严格等待6秒，让所有局完成 */
     private const val GAME_DURATION_MS = 6000L

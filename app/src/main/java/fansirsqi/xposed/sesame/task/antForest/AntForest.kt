@@ -2141,12 +2141,10 @@ class AntForest : ModelTask(), EnergyCollectCallback {
         if (errorWait) return
         val userId = obj.getString("userId")
         if (userId == selfId) return  // 跳过自己
-
         // 检查是否在"手速太快"冷却期
         if (ForestUtil.isUserInFrequencyCooldown(userId)) {
             return  // 跳过处理
         }
-
         var userName = obj.optString("displayName", UserMap.getMaskName(userId))
         if (emptyForestCache.containsKey(userId)) { //本轮已知为空的树林
             return

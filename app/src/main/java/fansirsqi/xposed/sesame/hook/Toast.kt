@@ -4,12 +4,12 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import fansirsqi.xposed.sesame.model.BaseModel.Companion.showToast
-import fansirsqi.xposed.sesame.model.BaseModel.Companion.toastOffsetY
 import fansirsqi.xposed.sesame.model.BaseModel.Companion.toastPerfix
 import fansirsqi.xposed.sesame.util.Log
+import fansirsqi.xposed.sesame.util.ToastUtil
 
 object Toast {
-    private val TAG: String = Toast::class.java.getSimpleName()
+    private const val TAG: String = "Toast"
 
 
     /**
@@ -18,20 +18,20 @@ object Toast {
      * @param message 要显示的消息
      */
     @JvmOverloads
-    fun show(message: CharSequence?, force: Boolean = false) {
-        var message = message
+    fun show(message: String?, force: Boolean = false) {
         val context = ApplicationHook.getAppContext()
         if (context == null) {
-            Log.runtime(TAG, "Context is null, cannot show toast")
+            Log.error(TAG, "Context is null, cannot show toast $message")
             return
         }
-        val shouldShow = force || showToast.value
+        var finalMessage = message
+        val shouldShow = showToast.value
         val perfix = toastPerfix.value
-        if (!perfix.isNullOrBlank() || perfix != "null") {
-            message = "$perfix:$message"
+        if (!perfix.isNullOrBlank() && perfix != "null") {
+            finalMessage = "$perfix:$message"
         }
         if (shouldShow) {
-            displayToast(context.applicationContext, message)
+            displayToast(context.applicationContext, finalMessage)
         }
     }
 
@@ -65,11 +65,7 @@ object Toast {
     private fun createAndShowToast(context: Context?, message: CharSequence?) {
         try {
             val toast = android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT)
-            toast.setGravity(
-                toast.gravity,
-                toast.xOffset,
-                toastOffsetY.value
-            )
+            ToastUtil.setToastGravity(toast)
             toast.show()
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "createAndShowToast err:", t)

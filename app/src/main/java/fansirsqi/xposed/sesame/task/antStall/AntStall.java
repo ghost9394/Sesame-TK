@@ -259,7 +259,7 @@ public class AntStall extends ModelTask {
                     }
                     if (friend.getBoolean("canInviteOpenShop")) {
                         s = AntStallRpcCall.oneKeyInviteOpenShop(friendUserId, seatId);
-                        if (s == null || s.isEmpty()) {
+                        if (s.isEmpty()) {
                             Log.record(TAG, "邀请[" + UserMap.getMaskName(friendUserId) + "]开店返回空，跳过");
                             continue;
                         }
@@ -495,8 +495,8 @@ public class AntStall extends ModelTask {
     }
 
     private void friendHomeOpen(List<Seat> seats, Queue<String> shopIds) {
-        Collections.sort(seats, (e1, e2) -> e2.hot - e1.hot);
-        String currentUid = UserMap.getCurrentUid();
+        seats.sort((e1, e2) -> e2.hot - e1.hot);
+        String currentUid = UserMap.INSTANCE.getCurrentUid();
         for (Seat seat : seats) {
             String shopId = shopIds.poll();
             if (shopId == null) {

@@ -2,7 +2,6 @@
 
 package fansirsqi.xposed.sesame.task.antFarm
 
-import android.annotation.SuppressLint
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.core.type.TypeReference
@@ -27,7 +26,7 @@ import fansirsqi.xposed.sesame.model.modelFieldExt.SelectModelField
 import fansirsqi.xposed.sesame.model.modelFieldExt.StringModelField
 import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.newutil.DataStore.getOrCreate
-
+import fansirsqi.xposed.sesame.newutil.TaskBlacklist
 import fansirsqi.xposed.sesame.task.AnswerAI.AnswerAI
 import fansirsqi.xposed.sesame.task.ModelTask
 import fansirsqi.xposed.sesame.task.TaskCommon
@@ -784,7 +783,6 @@ class AntFarm : ModelTask() {
                         SubAnimalType.NORMAL -> Log.record(TAG, "小鸡太饿，离家出走了")
                         SubAnimalType.PIRATE -> Log.record(TAG, "小鸡外出探险了")
                         SubAnimalType.WORK -> Log.record(TAG, "小鸡出去工作啦")
-                        else -> Log.record(TAG, "小鸡不在庄园" + " " + ownerAnimal.subAnimalType)
                     }
                     var hungry = false
                     val userName =
@@ -1575,6 +1573,7 @@ class AntFarm : ModelTask() {
         return false
     }
 
+    @Suppress("SameParameterValue")
     private fun answerQuestion(activityId: String?) {
         try {
             val today = TimeUtil.getDateStr2()
@@ -1682,7 +1681,7 @@ class AntFarm : ModelTask() {
                         val isCorrect = joActionTitle.getBoolean("correct")
                         if (isCorrect) {
                             val nextAnswer = joActionTitle.getString("title")
-                            farmAnswerCache.put(previewTitle, nextAnswer) // 缓存下一个问题的答案
+                            farmAnswerCache[previewTitle] = nextAnswer // 缓存下一个问题的答案
                         }
                     }
                 }
@@ -1716,7 +1715,7 @@ class AntFarm : ModelTask() {
                         val dateInt = convertDateToInt(dateStr)
                         if (dateInt == -1) continue
                         if (todayInt - dateInt <= daysToKeep) {
-                            cleanedMap.put(entry.key, entry.value) //保存7天内的答案
+                            cleanedMap[entry.key] = entry.value //保存7天内的答案
                             Log.runtime(TAG, "保留 日期：" + todayInt + "缓存日期：" + dateInt + " 题目：" + parts[0])
                         }
                     }
@@ -1743,10 +1742,10 @@ class AntFarm : ModelTask() {
             return -1 // 格式错误
         }
         try {
-            val year = dateStr.substring(0, 4).toInt()
+            val year = dateStr.take(4).toInt()
             val month = dateStr.substring(5, 7).toInt()
             val day = dateStr.substring(8, 10).toInt()
-            if (month < 1 || month > 12 || day < 1 || day > 31) {
+            if (month !in 1..12 || day < 1 || day > 31) {
                 Log.error("日期无效：$dateStr")
                 return -1 // 日期无效
             }
@@ -1814,23 +1813,6 @@ class AntFarm : ModelTask() {
      */
     private suspend fun doFarmTasks() {
         try {
-            val presetBad: MutableSet<String?> = LinkedHashSet(
-                mutableListOf<String?>(
-                    "HEART_DONATION_ADVANCED_FOOD_V2",  //香草芒果冰糕任务
-                    "HEART_DONATE",  //爱心捐赠
-                    "SHANGOU_xiadan",  //去买秋天第一杯奶茶
-                    "OFFLINE_PAY",  //到店付款,线下支付
-                    "ONLINE_PAY",  //在线支付
-                    "HUABEI_MAP_180" //用花呗完成一笔支付
-                )
-            )
-            val typeRef: TypeReference<MutableSet<String?>> =
-                object : TypeReference<MutableSet<String?>>() {
-                }
-            val badTaskSet: MutableSet<String?> =
-                DataStore.getOrCreate("badFarmTaskSet", typeRef)
-            badTaskSet.addAll(presetBad)
-            DataStore.put("badFarmTaskSet", badTaskSet)
             val jo = JSONObject(AntFarmRpcCall.listFarmTask())
             if (ResChecker.checkRes(TAG, jo)) {
                 val farmTaskList = jo.getJSONArray("farmTaskList")
@@ -1841,13 +1823,16 @@ class AntFarm : ModelTask() {
                     val bizKey = task.getString("bizKey")
                     task.optString("taskMode")
                     // 跳过已被屏蔽的任务
-                    if (badTaskSet.contains(bizKey)) continue
+                    if (TaskBlacklist.isTaskInBlacklist(bizKey)) continue
+
                     // 跳过今日已达上限的任务
-                    if (Status.hasFlagToday("farm::task::limit::$bizKey")) continue
+                    if (Status.hasFlagToday("farm::task::limit::$bizKey")) {
+                        Log.record("庄园任务[$title]今日已达上限，跳过执行")
+                        continue
+                    }
 
                     if (TaskStatus.TODO.name == taskStatus) {
-                        if (!badTaskSet.contains(bizKey)) {
-                            if ("VIDEO_TASK" == bizKey) {
+                        if ("VIDEO_TASK" == bizKey) {
                                 val taskVideoDetailjo =
                                     JSONObject(AntFarmRpcCall.queryTabVideoUrl())
                                 if (ResChecker.checkRes(TAG, taskVideoDetailjo)) {
@@ -1863,30 +1848,31 @@ class AntFarm : ModelTask() {
                                         val resultVideojo =
                                             JSONObject(AntFarmRpcCall.videoTrigger(contentId))
                                         if (ResChecker.checkRes(TAG, resultVideojo)) {
-                                            Log.farm("庄园任务🧾[$title]")
+                                            Log.farm("庄园任务1🧾[$title]")
+                                        }
+                                    }
+                                } else {
+                                    val taskDetailResult = AntFarmRpcCall.doFarmTask(bizKey)
+                                    if (taskDetailResult.isNullOrEmpty()) {
+                                    //     Log.error(TAG, "庄园任务[$title]执行失败：API返回空结果")
+                                        return
+                                    }
+                                    val taskDetailjo = JSONObject(taskDetailResult)
+                                    if (ResChecker.checkRes(TAG, taskDetailjo)) {
+                                        Log.farm("庄园任务2🧾[$title]")
+                                    } else {
+                                        val resultCode = taskDetailjo.optString("resultCode", "")
+                                        if (resultCode == "309") {
+                                            // 任务达到当日上限，标记今日不再执行
+                                            Status.setFlagToday("farm::task::limit::$bizKey")
+                                            Log.record(TAG, "庄园任务[$title]今日已达上限，跳过后续执行")
+                                        } else {
+                                            // 其他错误，使用统一黑名单管理器自动处理
+                                            Log.error("庄园任务失败：$title\n$taskDetailjo")
+                                            TaskBlacklist.autoAddToBlacklist(bizKey, title, resultCode)
                                         }
                                     }
                                 }
-                            } else if ("ANSWER" == bizKey) {
-                                answerQuestion("100") //答题
-                            } else {
-                                val taskDetailjo = JSONObject(AntFarmRpcCall.doFarmTask(bizKey))
-                                if (ResChecker.checkRes(TAG, taskDetailjo)) {
-                                    Log.farm("庄园任务🧾[$title]")
-                                } else {
-                                    val resultCode = taskDetailjo.optString("resultCode", "")
-                                    if (resultCode == "309") {
-                                        // 任务达到当日上限，标记今日不再执行
-                                        Status.setFlagToday("farm::task::limit::$bizKey")
-                                        Log.record(TAG, "庄园任务[$title]今日已达上限，跳过后续执行")
-                                    } else {
-                                        // 其他错误，永久屏蔽该任务
-                                        Log.error("庄园任务失败：$title\n$taskDetailjo")
-                                        badTaskSet.add(bizKey) // 避免重复失败
-                                        DataStore.put("badFarmTaskSet", badTaskSet)
-                                    }
-                                }
-                            }
                         }
                     }
                     if ("ANSWER" == bizKey && !Status.hasFlagToday(CACHED_FLAG)) { //单独处理答题任务
@@ -3672,7 +3658,7 @@ class AntFarm : ModelTask() {
      * 同步家庭亲密度状态
      * @param groupId 家庭组ID
      */
-    private suspend fun syncFamilyStatusIntimacy(groupId: String?) {
+    private fun syncFamilyStatusIntimacy(groupId: String?) {
         try {
             val userId = UserMap.currentUid
             val jo = JSONObject(AntFarmRpcCall.syncFamilyStatus(groupId, "INTIMACY_VALUE", userId))
@@ -3864,7 +3850,7 @@ class AntFarm : ModelTask() {
      * 家庭扭蛋抽奖
      * @return 是否还有剩余抽奖次数
      */
-    private suspend fun familyDraw(): Boolean {
+    private fun familyDraw(): Boolean {
         try {
             val jo = JSONObject(AntFarmRpcCall.familyDraw())
             if (ResChecker.checkRes(TAG, jo)) {
@@ -3951,7 +3937,7 @@ class AntFarm : ModelTask() {
         }
     }
 
-    private suspend fun familyDrawSignReceiveFarmTaskAward(taskId: String?, title: String?) {
+    private fun familyDrawSignReceiveFarmTaskAward(taskId: String?, title: String?) {
         try {
             val jo = JSONObject(AntFarmRpcCall.familyDrawSignReceiveFarmTaskAward(taskId))
             if (ResChecker.checkRes(TAG, jo)) {
@@ -3966,7 +3952,7 @@ class AntFarm : ModelTask() {
         }
     }
 
-    private suspend fun queryRecentFarmFood(queryNum: Int): JSONArray? {
+    private fun queryRecentFarmFood(queryNum: Int): JSONArray? {
         try {
             val jo = JSONObject(AntFarmRpcCall.queryRecentFarmFood(queryNum))
             if (!ResChecker.checkRes(TAG, jo)) {
@@ -3993,7 +3979,7 @@ class AntFarm : ModelTask() {
         return null
     }
 
-    private suspend fun familyFeedFriendAnimal(animals: JSONArray) {
+    private fun familyFeedFriendAnimal(animals: JSONArray) {
         try {
             for (i in 0..<animals.length()) {
                 val animal = animals.getJSONObject(i)
