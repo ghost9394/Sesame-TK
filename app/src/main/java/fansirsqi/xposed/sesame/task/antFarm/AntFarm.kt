@@ -2121,6 +2121,11 @@ class AntFarm : ModelTask() {
         //    单位换算：consumeSpeed 单位为 g/s，因此 1 小时的消耗 = totalConsumeSpeed * 3600
         var isUseAccelerateTool = false
         while (foodInTroughLimitCurrent - totalFoodHaveEatten >= totalConsumeSpeed * 3600) {
+            // 检查本地计数器上限，防止无限使用
+            if (!Status.canUseAccelerateTool()) {
+                Log.record(TAG, "加速卡内部⏩已达到本地使用上限(8次)，停止使用")
+                break
+            }
             // 可选条件：若勾选“仅心情满值时加速”，且当前心情不为 100，则跳出
             if ((useAccelerateToolWhenMaxEmotion!!.value && finalScore != 100.0)) {
                 break

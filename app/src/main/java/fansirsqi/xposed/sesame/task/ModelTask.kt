@@ -168,7 +168,7 @@ abstract class ModelTask : Model() {
                     Log.runtime("子任务协程被取消: $taskName-$childId - ${e.message}")
                     // 协程取消是正常现象，不需要打印堆栈
                 } else {
-                    Log.printStackTrace("子任务执行异常1: $taskName-$childId", e)
+                    Log.printStackTrace("addChildTaskSuspend 子任务执行异常1: $taskName-$childId", e)
                 }
             } finally {
                 childTaskMap.remove(childId)
@@ -230,7 +230,7 @@ abstract class ModelTask : Model() {
                     // 协程取消属于正常控制流程（如停止任务/切换用户），不视为错误
                     Log.runtime(TAG, "任务被取消: ${getName()}")
                 } catch (e: Exception) {
-                    Log.printStackTrace("任务执行异常: ${getName()}", e)
+                    Log.printStackTrace("startTask err: ${getName()}", e)
                 } finally {
                     isRunning = false
                     updateNextExecText(-1)
@@ -286,7 +286,6 @@ abstract class ModelTask : Model() {
         }
     }
 
-
     /**
      * 停止任务（协程版本）
      * 注意：此方法是非阻塞的，会异步取消任务
@@ -308,16 +307,15 @@ abstract class ModelTask : Model() {
                     try {
                         childTask.cancel()
                     } catch (e: Exception) {
-                        Log.printStackTrace("取消子任务异常", e)
+                        Log.printStackTrace("stopTask err", e)
                     }
                 }
                 childTaskMap.clear()
             } catch (e: Exception) {
-                Log.printStackTrace("清理子任务映射异常", e)
+                Log.printStackTrace("stopTask err", e)
             }
         }
     }
-
 
     /**
      * 任务执行模式（仅支持顺序执行）
@@ -452,7 +450,7 @@ abstract class ModelTask : Model() {
                     // 协程取消是正常现象，不需要打印堆栈
                     return
                 } else {
-                    Log.printStackTrace("子任务执行异常2: $parentTaskName-$id", e)
+                    Log.printStackTrace("run err: $parentTaskName-$id", e)
                     throw e
                 }
             }

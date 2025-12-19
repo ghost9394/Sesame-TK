@@ -8,7 +8,6 @@ import java.util.List; //健康岛导入的
 
 import fansirsqi.xposed.sesame.hook.ApplicationHook;
 import fansirsqi.xposed.sesame.hook.RequestManager;
-import fansirsqi.xposed.sesame.util.Log;
 
 public class AntSportsRpcCall {
     private static final String chInfo = "ch_appcenter__chsub_9patch",
@@ -46,7 +45,6 @@ public class AntSportsRpcCall {
                 "]";
         return RequestManager.requestString("com.alipay.sportshealth.biz.rpc.SportsHealthCoinTaskRpc.queryCoinTaskPanel", args1);
     }
-
 
     //完整签到，如果任务需要就签到哦
     public static String signUpTask(String taskId) {
@@ -140,11 +138,6 @@ public class AntSportsRpcCall {
                 "]";
         return RequestManager.requestString("com.alipay.neverland.biz.rpc.pickBubbleTaskEnergy", args1);
     }
-
-
-
-
-
 
     public static String queryEnergyBubbleModule() {
         // 构建请求的参数 JSON 字符串
@@ -760,7 +753,6 @@ public class AntSportsRpcCall {
             );
         }
 
-
         /**
          * 领取能量任务奖励
          * RPC: com.alipay.neverland.biz.rpc.energyReceive
@@ -792,9 +784,6 @@ public class AntSportsRpcCall {
                     paramJson.toString()
             );
         }
-
-
-
 
         /**
          * 健康岛 - 提交 Neverland 任务（用于 PROMOKERNEL_TASK 无 bizId 或特殊任务）
@@ -955,10 +944,6 @@ public class AntSportsRpcCall {
                             "}]"
             );
         }
-
-
-
-
 
         /**
          * 领取奖励

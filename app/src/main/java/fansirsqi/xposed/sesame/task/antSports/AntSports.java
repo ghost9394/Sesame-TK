@@ -9,7 +9,6 @@ import java.net.URLDecoder;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;//健康岛
 import java.util.Date;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;//健康岛
 import java.util.Random;
@@ -77,7 +76,6 @@ public class AntSports extends ModelTask {
     private BooleanModelField neverlandGrid;    //健康岛走路
 
     private IntegerModelField neverlandGridStepCount;   //健康岛
-
 
     @Override
     public String getName() {
@@ -282,8 +280,7 @@ public class AntSports extends ModelTask {
                 Log.other(TAG, "运动好礼🎐兑换[" + itemTitle + "]花费" + valueCoinCount + "运动币");
             }
         } catch (Throwable t) {
-            Log.error(TAG, "trainMember err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "trainMember err:",t);
         }
     }
 
@@ -352,7 +349,7 @@ public class AntSports extends ModelTask {
                             break;
 
                         default:
-                            Log.record(TAG, "做任务得能量🎈[未知状态：" + taskName + "，状态：" + taskStatus + "]");
+                            Log.error(TAG, "做任务得能量🎈[未知状态：" + taskName + "，状态：" + taskStatus + "]");
                             break;
                     }
                 }
@@ -386,7 +383,7 @@ public class AntSports extends ModelTask {
             } else {
                 String errorMsg = resultData.optString("errorMsg", "未知错误");
                 String errorCode = resultData.optString("errorCode", "");
-                Log.record(TAG, "做任务得能量🎈[领取失败：" + taskName + "，错误：" + errorCode + " - " + errorMsg + "]");
+                Log.error(TAG, "做任务得能量🎈[领取失败：" + taskName + "，错误：" + errorCode + " - " + errorMsg + "]");
 
                 // 不可重试的错误视为完成
                 if (!resultData.optBoolean("retryable", true) || "CAMP_TRIGGER_ERROR".equals(errorCode)) {
@@ -394,7 +391,7 @@ public class AntSports extends ModelTask {
                 }
             }
         } catch (Exception e) {
-            Log.record(TAG, "做任务得能量🎈[领取异常：" + taskName + "，错误：" + e.getMessage() + "]");
+            Log.error(TAG, "做任务得能量🎈[领取异常：" + taskName + "，错误：" + e.getMessage() + "]");
         }
         return false;
     }
@@ -437,7 +434,7 @@ public class AntSports extends ModelTask {
                     }
                 } else {
                     String errorMsg = result.optString("errorMsg", "未知错误");
-                    Log.record(TAG, "做任务得能量🎈[任务失败：" + taskName + "，错误：" + errorMsg + "]#(" + (i + 1) + "/" + remainingNum + ")");
+                    Log.error(TAG, "做任务得能量🎈[任务失败：" + taskName + "，错误：" + errorMsg + "]#(" + (i + 1) + "/" + remainingNum + ")");
                     break;
                 }
 
@@ -448,7 +445,7 @@ public class AntSports extends ModelTask {
 
             return true;
         } catch (Exception e) {
-            Log.record(TAG, "做任务得能量🎈[执行异常：" + taskName + "，错误：" + e.getMessage() + "]");
+            Log.error(TAG, "做任务得能量🎈[执行异常：" + taskName + "，错误：" + e.getMessage() + "]");
             return false;
         }
     }
@@ -465,10 +462,10 @@ public class AntSports extends ModelTask {
                 return true;
             } else {
                 String errorMsg = resultData.optString("errorMsg", "未知错误");
-                Log.record(TAG, "做任务得能量🎈[签到失败：" + taskName + "，错误：" + errorMsg + "]");
+                Log.error(TAG, "做任务得能量🎈[签到失败：" + taskName + "，错误：" + errorMsg + "]");
             }
         } catch (Exception e) {
-            Log.record(TAG, "做任务得能量🎈[签到异常：" + taskName + "，错误：" + e.getMessage() + "]");
+            Log.error(TAG, "做任务得能量🎈[签到异常：" + taskName + "，错误：" + e.getMessage() + "]");
         }
         return false;
     }
@@ -482,7 +479,7 @@ public class AntSports extends ModelTask {
         try {
             JSONObject jo = new JSONObject(AntSportsRpcCall.queryEnergyBubbleModule());
             if (!ResChecker.checkRes(TAG,jo)) {
-                Log.runtime(TAG, "queryEnergyBubbleModule fail: " + jo.toString());
+                Log.error(TAG, "queryEnergyBubbleModule fail: " + jo.toString());
                 return;
             }
 
@@ -527,7 +524,7 @@ public class AntSports extends ModelTask {
                 } else {
                     String errorCode = completeRes.optString("errorCode", "");
                     String errorMsg = completeRes.optString("errorMsg", "");
-                    Log.record(TAG, "运动球任务❌[" + sourceName + "]#" + errorCode + " - " + errorMsg);
+                    Log.error(TAG, "运动球任务❌[" + sourceName + "]#" + completeRes+" 任务："+bubble);
                 }
 
                 // 每处理一个任务随机休息 1-3 秒
@@ -546,15 +543,14 @@ public class AntSports extends ModelTask {
                         Log.other(TAG, "拾取能量球成功  当前余额: " + balance + "💰");
                     }
                 } else {
-                    Log.record(TAG, "领取能量球任务失败: " + resultJson.optString("errorMsg", "未知错误"));
+                    Log.error(TAG, "领取能量球任务失败: " + resultJson.optString("errorMsg", "未知错误"));
                 }
             } else {
                 Log.record(TAG, "未完成任何任务，跳过领取能量球");
             }
 
         } catch (Throwable t) {
-            Log.runtime(TAG, "sportsEnergyBubbleTask err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "sportsEnergyBubbleTask err:",t);
         }
     }
 
@@ -576,8 +572,7 @@ public class AntSports extends ModelTask {
                 Log.record(jo.toString());
             }
         } catch (Exception e) {
-            Log.record(TAG, "sportsCheck_in err");
-            Log.printStackTrace(e);
+            Log.printStackTrace(TAG,"sportsCheck_in err",e);
         }
     }
 
@@ -605,8 +600,7 @@ public class AntSports extends ModelTask {
                 Log.runtime(TAG, s);
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "receiveCoinAsset err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "receiveCoinAsset err:",t);
         }
     }
 
@@ -638,8 +632,7 @@ public class AntSports extends ModelTask {
                 walkGo(userPathStep.getString("pathId"), useStepCount, userPathStep.getString("pathName"));
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "walk err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "walk err:",t);
         }
     }
 
@@ -653,8 +646,7 @@ public class AntSports extends ModelTask {
                 queryPath(pathId);
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "walkGo err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "walkGo err:",t);
         }
     }
 
@@ -666,8 +658,7 @@ public class AntSports extends ModelTask {
                 theme = jo.getJSONObject("data");
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "queryWorldMap err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "queryWorldMap err:",t);
         }
         return theme;
     }
@@ -680,8 +671,7 @@ public class AntSports extends ModelTask {
                 city = jo.getJSONObject("data");
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "queryCityPath err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "queryCityPath err:",t);
         }
         return city;
     }
@@ -701,8 +691,7 @@ public class AntSports extends ModelTask {
                 }
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "queryPath err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "queryPath err:",t);
         }
         return path;
     }
@@ -719,8 +708,7 @@ public class AntSports extends ModelTask {
                 Log.record(TAG, "行走路线🎁开启宝箱[" + jo.getString("rewardName") + "]*" + jo.getInt("count"));
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "receiveEvent err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "receiveEvent err:",t);
         }
     }
 
@@ -751,8 +739,7 @@ public class AntSports extends ModelTask {
                 }
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "queryJoinPath err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "queryJoinPath err:",t);
         }
         return pathId;
     }
@@ -768,11 +755,10 @@ public class AntSports extends ModelTask {
                 JSONObject path = queryPath(pathId);
                 Log.record(TAG, "行走路线🚶🏻‍♂️路线[" + path.getJSONObject("path").getString("name") + "]已加入");
             } else {
-                Log.record(TAG, "行走路线🚶🏻‍♂️路线[" + pathId + "]有误，无法加入！");
+                Log.error(TAG, "行走路线🚶🏻‍♂️路线[" + pathId + "]有误，无法加入！");
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "joinPath err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG,"joinPath err:", t);
         }
     }
 
@@ -846,8 +832,7 @@ public class AntSports extends ModelTask {
                 Log.runtime(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "queryMyHomePage err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "queryMyHomePage err:",t);
         }
     }
 
@@ -898,8 +883,7 @@ public class AntSports extends ModelTask {
                 Log.record(TAG, "好像没有可走的线路了！");
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "join err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "join err:",t);
         }
     }
 
@@ -922,8 +906,7 @@ public class AntSports extends ModelTask {
                 Log.runtime(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "go err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "go err:",t);
         }
     }
 
@@ -962,8 +945,7 @@ public class AntSports extends ModelTask {
                 }
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "parseTreasureBoxModel err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "parseTreasureBoxModel err:",t);
         }
     }
 
@@ -987,8 +969,7 @@ public class AntSports extends ModelTask {
                 Log.record(jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "openTreasureBox err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "openTreasureBox err:",t);
         }
         return 0;
     }
@@ -1019,8 +1000,7 @@ public class AntSports extends ModelTask {
                 Log.runtime(jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "queryProjectList err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "queryProjectList err:",t);
         }
     }
 
@@ -1034,8 +1014,7 @@ public class AntSports extends ModelTask {
                 Log.runtime(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "donate err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG,"donate err:", t);
         }
     }
 
@@ -1081,8 +1060,7 @@ public class AntSports extends ModelTask {
                 Log.runtime(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "queryWalkStep err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "queryWalkStep err:",t);
         }
     }
 
@@ -1113,8 +1091,7 @@ public class AntSports extends ModelTask {
                 Log.record(TAG, "文体每日任务" + " " + s);
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "userTaskGroupQuery err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "userTaskGroupQuery err:",t);
         }
     }
 
@@ -1163,8 +1140,7 @@ public class AntSports extends ModelTask {
                 }
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "participate err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "participate err:",t);
         }
     }
 
@@ -1202,8 +1178,7 @@ public class AntSports extends ModelTask {
                 Log.runtime(s);
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "userTaskRightsReceive err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "userTaskRightsReceive err:",t);
         }
     }
 
@@ -1241,8 +1216,7 @@ public class AntSports extends ModelTask {
                 Log.runtime(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "pathFeatureQuery err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "pathFeatureQuery err:",t);
         }
     }
 
@@ -1279,8 +1253,7 @@ public class AntSports extends ModelTask {
                 Log.runtime(s);
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "pathMapHomepage err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "pathMapHomepage err:",t);
         }
     }
 
@@ -1294,8 +1267,7 @@ public class AntSports extends ModelTask {
                 Log.runtime(TAG, jo.toString());
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "pathMapJoin err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "pathMapJoin err:",t);
         }
     }
 
@@ -1317,8 +1289,7 @@ public class AntSports extends ModelTask {
                 Log.runtime(TAG, s);
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "tiyubizGo err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "tiyubizGo err:",t);
         }
     }
 
@@ -1346,8 +1317,7 @@ public class AntSports extends ModelTask {
                 }
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "queryClubHome err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "queryClubHome err:",t);
         }
     }
 
@@ -1387,8 +1357,7 @@ public class AntSports extends ModelTask {
                     GlobalThreadPools.sleepCompat(1000);
                 }
             } catch (Throwable t) {
-                Log.runtime(TAG, "processBubbleList err:");
-                Log.printStackTrace(TAG, t);
+                Log.printStackTrace(TAG, "processBubbleList err:",t);
             }
         }
     }
@@ -1480,8 +1449,7 @@ public class AntSports extends ModelTask {
                 }
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "queryTrainItem err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "queryTrainItem err:",t);
         }
     }
 
@@ -1536,7 +1504,7 @@ public class AntSports extends ModelTask {
                 GlobalThreadPools.sleepCompat(500);
                 JSONObject memberPriceJson = new JSONObject(memberPriceResult);
                 if (!memberPriceJson.optBoolean("success", true)) {
-                    Log.runtime(TAG, "queryMemberPriceRanking err: " + memberPriceJson.optString("resultDesc"));
+                    Log.error(TAG, "queryMemberPriceRanking err: " + memberPriceJson.optString("resultDesc"));
                     continue;
                 }
 
@@ -1614,8 +1582,7 @@ public class AntSports extends ModelTask {
                 }
             }
         } catch (Throwable t) {
-            Log.runtime(TAG, "buyMember err:");
-            Log.printStackTrace(TAG, t);
+            Log.printStackTrace(TAG, "buyMember err:",t);
         }
     }
 
@@ -1667,8 +1634,7 @@ public class AntSports extends ModelTask {
 
                 Log.record(TAG, "健康岛任务结束");
             } catch (Throwable t) {
-                Log.error(TAG, "runNeverland err:");
-                Log.printStackTrace(TAG, t);
+                Log.printStackTrace(TAG, "runNeverland err:",t);
             }
         }
 
@@ -1718,8 +1684,7 @@ public class AntSports extends ModelTask {
                         + " 连续：" + newContinuity + " 天");
 
             } catch (Throwable t) {
-                Log.error(TAG, "neverlandDoSign err:"+t.toString());
-                Log.printStackTrace(TAG, t);
+                Log.printStackTrace(TAG,"neverlandDoSign err:"+t.toString(), t);
             }
         }
 
@@ -1834,11 +1799,8 @@ public class AntSports extends ModelTask {
                     }
                 }
             }
-
             Log.record(TAG, "任务大厅循环处理结束");
         }
-
-
 
         /**
          * 处理健康岛浏览任务
@@ -1858,7 +1820,7 @@ public class AntSports extends ModelTask {
                     if (!ResChecker.checkRes(TAG + "查询健康岛浏览任务失败:", taskInfoResp)
                             || taskInfoResp.optJSONObject("data") == null) {
 
-                        Log.other(TAG, "健康岛浏览任务查询失败 ["+taskInfoResp+"] 请关闭此功能");
+                        Log.error(TAG, "健康岛浏览任务查询失败 ["+taskInfoResp+"] 请关闭此功能");
                         return;
                     }
 
@@ -1866,7 +1828,7 @@ public class AntSports extends ModelTask {
 
                     // 如果没有任务，跳出循环
                     if (taskInfos == null || taskInfos.length() == 0) {
-                        Log.runtime(TAG, "健康岛浏览任务列表为空");
+                        Log.error(TAG, "健康岛浏览任务列表为空");
                         hasTask = false;  // 停止循环
                         continue;
                     }
@@ -1903,13 +1865,10 @@ public class AntSports extends ModelTask {
                         Thread.sleep(1000); // 任务间隔
                     }
                 }
-
             } catch (Throwable t) {
-                Log.printStackTrace(TAG, "处理健康岛任务异常", t);
+                Log.printStackTrace(TAG, "handleHealthIslandTask err", t);
             }
         }
-
-
 
         /**
          * 筛选待完成的任务（状态为 SIGNUP_COMPLETE）
@@ -1924,7 +1883,7 @@ public class AntSports extends ModelTask {
                     }
                 }
             } catch (Exception e) {
-                Log.printStackTrace(TAG, "筛选待完成任务失败", e);
+                Log.printStackTrace(TAG, "filterPendingTasks err", e);
             }
             return pendingTasks;
         }
@@ -1955,7 +1914,7 @@ public class AntSports extends ModelTask {
                         return false; // 未知类型算失败
                 }
             } catch (Exception e) {
-                Log.printStackTrace(TAG, "处理单个任务失败（任务名：" + task.optString("title") + "）", e);
+                Log.printStackTrace(TAG, "handleSingleTask 处理单个任务失败（任务名：" + task.optString("title") + "）", e);
                 return false;
             }
         }
@@ -1977,7 +1936,7 @@ public class AntSports extends ModelTask {
                     return false;
                 }
             } catch (Exception e) {
-                Log.printStackTrace(TAG, "处理 PROMOKERNEL_TASK 异常（" + title + "）", e);
+                Log.printStackTrace(TAG, "handlePromoKernelTask 处理 PROMOKERNEL_TASK 异常（" + title + "）", e);
                 return false;
             }
         }
@@ -2002,7 +1961,7 @@ public class AntSports extends ModelTask {
                     return false;
                 }
             } catch (Exception e) {
-                Log.printStackTrace(TAG, "处理 LIGHT_TASK 异常（" + title + "）", e);
+                Log.printStackTrace(TAG, "handleLightTask 处理 LIGHT_TASK 异常（" + title + "）", e);
                 return false;
             }
         }
@@ -2115,8 +2074,6 @@ public class AntSports extends ModelTask {
             }
         }
 
-
-
         // -------------------------------------------------------------------------
         // 4. 自动走路任务处理
         // -------------------------------------------------------------------------
@@ -2167,9 +2124,8 @@ public class AntSports extends ModelTask {
         }
 
         // =========================================================================
-// 健康岛自动任务
-// =========================================================================
-
+        // 健康岛自动任务
+        // =========================================================================
         /**
          * 健康岛走路建造任务入口
          *
@@ -2235,15 +2191,13 @@ public class AntSports extends ModelTask {
                 Log.record(TAG, "健康岛自动走路建造执行完成 ✓");
 
             } catch (Throwable t) {
-                Log.error(TAG, "neverlandAutoTask 发生异常"+t.toString());
-                Log.printStackTrace(TAG, t);
+                Log.printStackTrace(TAG, "neverlandAutoTask 发生异常"+t.toString(),t);
             }
         }
 
-// =========================================================================
-// 辅助函数
-// =========================================================================
-
+        // =========================================================================
+        // 辅助函数
+        // =========================================================================
         /**
          * 查询用户剩余能量
          *
@@ -2263,16 +2217,14 @@ public class AntSports extends ModelTask {
                 return balance;
 
             } catch (Throwable t) {
-                Log.error(TAG, "queryUserEnergy 发生异常");
-                Log.printStackTrace(TAG, t);
+                Log.printStackTrace(TAG, "queryUserEnergy err",t);
                 return 0;
             }
         }
 
-// =========================================================================
-// 旧版行走模式
-// =========================================================================
-
+        // =========================================================================
+        // 旧版行走模式
+        // =========================================================================
         /**
          * 执行自动行走任务(能量泵 走路模式)
          *
@@ -2377,21 +2329,12 @@ public class AntSports extends ModelTask {
                     }
                     Thread.sleep(888);
                 }
-
-
-
-
-
-
                 Log.record(TAG, "自动走路任务完成 ✓");
 
             } catch (Throwable t) {
-                Log.printStackTrace(TAG,"executeAutoWalk 发生异常", t);
+                Log.printStackTrace(TAG,"executeAutoWalk err", t);
             }
         }
-
-
-
 
         private void tryReceiveStageReward(String branchId, String mapId, JSONObject starData) {
             if (starData == null) return;
@@ -2492,7 +2435,6 @@ public class AntSports extends ModelTask {
             }
         }
 
-
         /**
          * 查询地图列表，优先返回状态为 DOING 的地图；
          * 若不存在 DOING，则从状态为 LOCKED 的地图中随机选择一个并尝试切换；
@@ -2566,7 +2508,7 @@ public class AntSports extends ModelTask {
                 return chooseMap(chosenLocked); // 调用统一的切换方法
 
             } catch (Throwable t) {
-                Log.printStackTrace(TAG,"chooseAvailableMap 发生异常", t);
+                Log.printStackTrace(TAG,"chooseAvailableMap err", t);
                 return null;
             }
         }
@@ -2596,12 +2538,10 @@ public class AntSports extends ModelTask {
                 }
             } catch (Throwable t) {
                 // 统一异常日志，避免原来的 Log.error(TAG, "")
-                Log.printStackTrace(TAG,"chooseMap 发生异常", t);
+                Log.printStackTrace(TAG,"chooseMap err", t);
                 return null;
             }
         }
-
-
 
         /**
          * 从 walkData 中提取步数增量
@@ -2621,10 +2561,9 @@ public class AntSports extends ModelTask {
             return 0;
         }
 
-// =========================================================================
-// 新游戏建造模式
-// =========================================================================
-
+        // =========================================================================
+        // 新游戏建造模式
+        // =========================================================================
         /**
          * 执行自动建造任务(新游戏模式)
          *
@@ -2754,7 +2693,7 @@ public class AntSports extends ModelTask {
                 Log.other(TAG, "自动建造任务完成 ✓");
 
             } catch (Throwable t) {
-                Log.printStackTrace(TAG,"executeAutoBuild 发生异常", t);
+                Log.printStackTrace(TAG,"executeAutoBuild err", t);
             }
         }
 

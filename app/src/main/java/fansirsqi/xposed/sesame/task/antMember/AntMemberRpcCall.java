@@ -335,8 +335,6 @@ public class AntMemberRpcCall {
         return RequestManager.requestString("com.alipay.alipaymember.biz.rpc.exchange.h5.exchangeBenefit", data);
     }
 
-
-
     // ================= 年度回顾（任务中心） =================
     public static final String ANNUAL_REVIEW_OPERATION_IDENTIFY =
             "independent_component_program2025111803036407";
@@ -869,7 +867,7 @@ public class AntMemberRpcCall {
                 args.put("ballIdList", ballIdList); // 直接用 JSONArray
 
                 return RequestManager.requestString(
-                        "com.antgroup.zmxy.zmcustprod.biz.rpc.growthbehavior.api.GrowthBehaviorRpcManager.collectProgressBall",
+                        "com.antgroup.zmxy.zmcustprod.biz.rpc.growthbehavior.apiGrowthBehaviorRpcManager.collectProgressBall",
                         new JSONArray().put(args).toString()
                 );
             } catch (Exception e) {

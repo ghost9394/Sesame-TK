@@ -30,16 +30,10 @@ android {
         }
 
     }
-    val gitCommitCount: Int = runCatching {
-        val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
-            .redirectErrorStream(true)
-            .start()
-        val output = process.inputStream.bufferedReader().use { it.readText().trim() }
-        output.toInt()
-    }.getOrElse {
-        println("获取 git 提交数失败: ${it.message}")
-        1
-    }
+    // 使用providers API来支持配置缓存
+    val gitCommitCount: Int = providers.exec {
+        commandLine("git", "rev-list", "--count", "HEAD")
+    }.standardOutput.asText.get().trim().toIntOrNull() ?: 1
     defaultConfig {
         vectorDrawables.useSupportLibrary = true
         applicationId = "fansirsqi.xposed.sesame"

@@ -403,7 +403,7 @@ public class AntMember extends ModelTask {
             String source = "DNHZ_NC_zhimajingnangSF"; // 从buttonUrl提取的source
             Log.record(TAG, "set Wua " + wua);
 
-            String spreadManureDataStr = AntOrchardRpcCall.orchardSpreadManure(Objects.requireNonNull(wua), source);
+            String spreadManureDataStr = AntOrchardRpcCall.orchardSpreadManure(Objects.requireNonNull(wua), source,false);
             JSONObject spreadManureData;
             try {
               spreadManureData = new JSONObject(spreadManureDataStr);
@@ -414,7 +414,6 @@ public class AntMember extends ModelTask {
 
             if (!"100".equals(spreadManureData.optString("resultCode"))) {
               Log.record(TAG, "农场 orchardSpreadManure 错误：" + spreadManureData.optString("resultDesc"));
-              Log.runtime(TAG, "农场 orchardSpreadManure 错误：" + spreadManureData.toString());
               continue;
             }
 
@@ -483,23 +482,13 @@ public class AntMember extends ModelTask {
 
       JSONObject collectJson = new JSONObject(collectResp);
 
-      Log.other(
-              TAG,
-              String.format(
-                      "领取完成 → 本次加速进度: %d, 当前加速倍率: %.2f",
-                      collectJson.optInt("collectedAccelerateProgress", -1),
-                      collectJson.optDouble("currentAccelerateValue", -1)
-              )
+      Log.other(TAG,String.format("领取完成 → 本次加速进度: %d, 当前加速倍率: %.2f",collectJson.optInt("collectedAccelerateProgress", -1),collectJson.optDouble("currentAccelerateValue", -1))
       );
 
     } catch (Exception e) {
-      e.printStackTrace();
+      Log.printStackTrace(TAG + "queryAndCollect err", e);
     }
   }
-
-
-
-
 
   /**
    * 年度回顾任务：通过 programInvoke 查询并自动完成任务
@@ -815,11 +804,9 @@ public class AntMember extends ModelTask {
       }
       IdMapManager.getInstance(MemberBenefitsMap.class).save(userId);
     } catch (JSONException e) {
-      Log.record(TAG,"JSON解析错误: " + e.getMessage());
-      Log.printStackTrace(TAG, e);
+      Log.printStackTrace(TAG, "JSON解析错误: " + e.getMessage(),e);
     } catch (Throwable t) {
-      Log.runtime(TAG, "memberPointExchangeBenefit err:");
-      Log.printStackTrace(TAG, t);
+      Log.printStackTrace(TAG, "memberPointExchangeBenefit err:",t);
     }
   }
 
@@ -831,8 +818,7 @@ public class AntMember extends ModelTask {
         return true;
       }
     } catch (Throwable t) {
-      Log.runtime(TAG, "exchangeBenefit err:");
-      Log.printStackTrace(TAG, t);
+      Log.printStackTrace(TAG, "exchangeBenefit err:",t);
     }
     return false;
   }
@@ -856,7 +842,7 @@ public class AntMember extends ModelTask {
       }
       queryPointCert(1, 8);
     } catch (Throwable t) {
-      Log.printStackTrace(TAG, t);
+      Log.printStackTrace(TAG, "doMemberSign err:",t);
     }
   }
 
@@ -882,8 +868,7 @@ public class AntMember extends ModelTask {
         processTask(task);
       }
     } catch (Throwable t) {
-      Log.runtime(TAG, "doAllMemberAvailableTask err:");
-      Log.printStackTrace(TAG, t);
+      Log.printStackTrace(TAG, "doAllMemberAvailableTask err:",t);
     }
   }
 
@@ -922,8 +907,7 @@ public class AntMember extends ModelTask {
         Log.runtime(s);
       }
     } catch (Throwable t) {
-      Log.runtime(TAG, "queryPointCert err:");
-      Log.printStackTrace(TAG, t);
+      Log.printStackTrace(TAG, "queryPointCert err:",t);
     }
   }
 
@@ -936,7 +920,6 @@ public class AntMember extends ModelTask {
       String s = AntMemberRpcCall.queryHome();
       JSONObject jo = new JSONObject(s);
       if (!ResChecker.checkRes(TAG, jo)) {
-        Log.other(TAG, "芝麻信用💳[首页响应失败]#" + jo.optString("errorMsg"));
         Log.error(TAG + ".checkSesameCanRun.queryHome", "芝麻信用💳[首页响应失败]#" + s);
         return false;
       }
@@ -953,7 +936,7 @@ public class AntMember extends ModelTask {
   }
 
   /**
-   * 芝麻信用任务 - 重构版本
+   * 芝麻信用任务
    */
   private void doAllAvailableSesameTask() {
     try {
@@ -964,12 +947,9 @@ public class AntMember extends ModelTask {
         jo = jo.getJSONObject("resData");
       }
       if (!ResChecker.checkRes(TAG, jo)) {
-        Log.other(TAG, "芝麻信用💳[查询任务响应失败]#" + jo.getString("resultCode"));
         Log.error(TAG + ".doAllAvailableSesameTask.queryAvailableSesameTask", "芝麻信用💳[查询任务响应失败]#" + s);
         return;
       }
-
-      // Log.record(TAG, "芝麻信用💳[查询任务响应]#" + s);
 
       JSONObject taskObj = jo.getJSONObject("data");
       int totalTasks = 0;
@@ -1018,7 +998,7 @@ public class AntMember extends ModelTask {
         Log.record(TAG, "芝麻信用💳[已全部完成任务，临时关闭]");
       }
     } catch (Throwable t) {
-      Log.printStackTrace(TAG + ".doAllAvailableSesameTask", t);
+      Log.printStackTrace(TAG + "doAllAvailableSesameTask err", t);
     }
   }
 
@@ -1120,14 +1100,14 @@ public class AntMember extends ModelTask {
         GlobalThreadPools.sleepCompat(200);
         responseObj = new JSONObject(s);
         if (!ResChecker.checkRes(TAG, responseObj)) {
-          Log.other(TAG, "芝麻信用💳[领取任务" + taskTitle + "失败]#" + s);
+          Log.error(TAG, "芝麻信用💳[领取任务" + taskTitle + "失败]#" + s);
           skippedCount++;
           continue;
         }
         recordId = responseObj.getJSONObject("data").getString("recordId");
       } else {
         if (!task.has("recordId")) {
-          Log.other(TAG, "芝麻信用💳[任务" + taskTitle + "未获取到recordId]#" + task);
+          Log.error(TAG, "芝麻信用💳[任务" + taskTitle + "未获取到recordId]#" + task);
           skippedCount++;
           continue;
         }
@@ -1143,7 +1123,7 @@ public class AntMember extends ModelTask {
           Log.record(TAG, "芝麻信用💳[完成任务" + taskTitle + "]#(" + (j + 1) + "/" + needCompleteNum + "天)");
           taskCompleted = true;
         } else {
-          Log.other(TAG, "芝麻信用💳[完成任务" + taskTitle + "失败]#" + s);
+          Log.error(TAG, "芝麻信用💳[完成任务" + taskTitle + "失败]#" + s);
           break;
         }
       }
@@ -1187,7 +1167,7 @@ public class AntMember extends ModelTask {
                                   prize.optJSONObject("prize").optInt("num", 0) : 0) : 0;
                   Log.other("芝麻炼金⚗️[每日签到成功]#获得" + num + "粒");
                 } else {
-                  Log.runtime(TAG + ".doSesameAlchemy", "炼金签到失败:" + completeRes);
+                  Log.error(TAG + ".doSesameAlchemy", "炼金签到失败:" + completeRes);
                 }
               } catch (Throwable e) {
                 Log.printStackTrace(TAG + ".doSesameAlchemy.alchemyCheckInComplete", e);
@@ -1201,8 +1181,6 @@ public class AntMember extends ModelTask {
     }
   }
 
-
-  //z
   private void doSesameAlchemyNextDayAward() {
     try {
 
@@ -1248,7 +1226,6 @@ public class AntMember extends ModelTask {
     }
   }
 
-
   /**
    * 芝麻粒收取
    * @param withOneClick 启用一键收取
@@ -1258,7 +1235,6 @@ public class AntMember extends ModelTask {
       JSONObject jo = new JSONObject(AntMemberRpcCall.queryCreditFeedback());
       GlobalThreadPools.sleepCompat(500);
       if (!ResChecker.checkRes(TAG, jo)) {
-        Log.other(TAG, "芝麻信用💳[查询未领取芝麻粒响应失败]#" + jo.getString("resultView"));
         Log.error(TAG + ".collectSesame.queryCreditFeedback", "芝麻信用💳[查询未领取芝麻粒响应失败]#" + jo);
         return;
       }
@@ -1268,7 +1244,6 @@ public class AntMember extends ModelTask {
         jo = new JSONObject(AntMemberRpcCall.collectAllCreditFeedback());
         GlobalThreadPools.sleepCompat(2000);
         if (!ResChecker.checkRes(TAG, jo)) {
-          Log.other(TAG, "芝麻信用💳[一键收取芝麻粒响应失败]#" + jo);
           Log.error(TAG + ".collectSesame.collectAllCreditFeedback", "芝麻信用💳[一键收取芝麻粒响应失败]#" + jo);
           return;
         }
@@ -1285,7 +1260,6 @@ public class AntMember extends ModelTask {
           jo = new JSONObject(AntMemberRpcCall.collectCreditFeedback(creditFeedbackId));
           GlobalThreadPools.sleepCompat(2000);
           if (!ResChecker.checkRes(TAG, jo)) {
-            Log.other(TAG, "芝麻信用💳[查询未领取芝麻粒响应失败]#" + jo.getString("resultView"));
             Log.error(TAG + ".collectSesame.collectCreditFeedback", "芝麻信用💳[收取芝麻粒响应失败]#" + jo);
             continue;
           }
@@ -1382,7 +1356,6 @@ public class AntMember extends ModelTask {
         Log.runtime(TAG,s);
       }
     } catch (Throwable t) {
-      Log.runtime(TAG);
       Log.printStackTrace(TAG, "kmdkSignIn err:", t);
     }
   }
@@ -1474,8 +1447,7 @@ public class AntMember extends ModelTask {
         Log.runtime(TAG,"taskListQuery err:" + " " + s);
       }
     } catch (Throwable t) {
-      Log.runtime(TAG, "taskListQuery err:");
-      Log.printStackTrace(TAG, t);
+      Log.printStackTrace(TAG,"taskListQuery err:", t);
     } finally {
       try {
         GlobalThreadPools.sleepCompat(1000);
@@ -1509,8 +1481,7 @@ public class AntMember extends ModelTask {
         Log.record(TAG,"taskReceive" + " " + s);
       }
     } catch (Throwable t) {
-      Log.runtime(TAG, "taskReceive err:");
-      Log.printStackTrace(TAG, t);
+      Log.printStackTrace(TAG, "taskReceive err:",t);
     }
   }
 
@@ -1523,7 +1494,7 @@ public class AntMember extends ModelTask {
       GlobalThreadPools.sleepCompat(200);
       JSONObject jo = new JSONObject(s);
       if (!ResChecker.checkRes(TAG, jo)) {
-        Log.other(TAG + ".collectInsuredGold.queryInsuredHome", "保障金🏥[响应失败]#" + s);
+        Log.error(TAG + ".collectInsuredGold.queryInsuredHome", "保障金🏥[响应失败]#" + s);
         return;
       }
       jo = jo.getJSONObject("data");
@@ -1534,7 +1505,7 @@ public class AntMember extends ModelTask {
         GlobalThreadPools.sleepCompat(2000);
         jo = new JSONObject(s);
         if (!ResChecker.checkRes(TAG, jo)) {
-          Log.other(TAG + ".collectInsuredGold.collectInsuredGold", "保障金🏥[响应失败]#" + s);
+          Log.error(TAG + ".collectInsuredGold.collectInsuredGold", "保障金🏥[响应失败]#" + s);
           return;
         }
         String gainGold = jo.getJSONObject("data").getString("gainSumInsuredYuan");
@@ -1546,7 +1517,7 @@ public class AntMember extends ModelTask {
         GlobalThreadPools.sleepCompat(2000);
         jo = new JSONObject(s);
         if (!ResChecker.checkRes(TAG, jo)) {
-          Log.other(TAG + ".collectInsuredGold.collectInsuredGold", "保障金🏥[响应失败]#" + s);
+          Log.error(TAG + ".collectInsuredGold.collectInsuredGold", "保障金🏥[响应失败]#" + s);
           return;
         }
         String gainGold = jo.getJSONObject("data").getJSONObject("gainSumInsuredDTO").getString("gainSumInsuredYuan");
@@ -1569,7 +1540,7 @@ public class AntMember extends ModelTask {
     String targetBusiness = taskConfigInfo.getJSONArray("targetBusiness").getString(0);
     String[] targetBusinessArray = targetBusiness.split("#");
     if (targetBusinessArray.length < 3) {
-      Log.runtime(TAG, "processTask target param err:" + Arrays.toString(targetBusinessArray));
+      Log.error(TAG, "processTask target param err:" + Arrays.toString(targetBusinessArray));
       return;
     }
     String bizType = targetBusinessArray[0];
@@ -1579,7 +1550,7 @@ public class AntMember extends ModelTask {
     String str = AntMemberRpcCall.executeTask(bizParam, bizSubType, bizType, id);
     JSONObject jo = new JSONObject(str);
     if (!ResChecker.checkRes(TAG + "执行会员任务失败:", jo)) {
-      Log.runtime(TAG, "执行任务失败:" + jo.optString("resultDesc"));
+      Log.error(TAG, "执行任务失败:" + jo.optString("resultDesc"));
       return;
     }
     if (checkMemberTaskFinished(id)) {
@@ -1723,7 +1694,7 @@ public class AntMember extends ModelTask {
       }
 
       if (productId == null || productId.isEmpty()) {
-        Log.record("黄金票🎫[提取异常] 未找到有效的基金ID");
+        Log.error("黄金票🎫[提取异常] 未找到有效的基金ID");
         return;
       }
 
@@ -1746,7 +1717,7 @@ public class AntMember extends ModelTask {
           if (!writeOffNo.isEmpty()) {
             Log.other("黄金票🎫[提取成功]#消耗: " + extractAmount + " 份");
           } else {
-            Log.record("黄金票🎫[提取失败] 未返回核销码");
+            Log.error("黄金票🎫[提取失败] 未返回核销码");
           }
         }
       }
@@ -1764,13 +1735,13 @@ public class AntMember extends ModelTask {
         JSONObject root = new JSONObject(resp);
         if (!ResChecker.checkRes(TAG, root)) {
           String msg = root.optString("errorMsg", root.optString("resultView", resp));
-          Log.record(TAG + ".enableGameCenter.signIn", "游戏中心🎮[签到查询失败]#" + msg);
+          Log.error(TAG + ".enableGameCenter.signIn", "游戏中心🎮[签到查询失败]#" + msg);
         } else {
           JSONObject data = root.optJSONObject("data");
 
           // 情况1：data 为 null 或 空对象 → 默认已经签到过
           if (data == null || data.length() == 0) {
-            Log.record(TAG + ".enableGameCenter.signIn", "游戏中心🎮[今日已签到](data为空)");
+            Log.error(TAG + ".enableGameCenter.signIn", "游戏中心🎮[今日已签到](data为空)");
             return;
           }
           JSONObject signModule = data != null ? data.optJSONObject("signInBallModule") : null;
@@ -1783,7 +1754,7 @@ public class AntMember extends ModelTask {
             JSONObject signJo = new JSONObject(signResp);
             if (!ResChecker.checkRes(TAG, signJo)) {
               String msg = signJo.optString("errorMsg", signJo.optString("resultView", signResp));
-              Log.record(TAG + ".enableGameCenter.signIn", "游戏中心🎮[签到失败]#" + msg);
+              Log.error(TAG + ".enableGameCenter.signIn", "游戏中心🎮[签到失败]#" + msg);
             } else {
               JSONObject signData = signJo.optJSONObject("data");
               String title = "";
@@ -1819,14 +1790,13 @@ public class AntMember extends ModelTask {
                   if (sb.length() > 0) sb.append(" ");
                   sb.append(desc);
                 }
-                Log.record(TAG + ".enableGameCenter.signIn", "游戏中心🎮[签到失败]#" + (sb.length() > 0 ? sb.toString() : signResp));
+                Log.error(TAG + ".enableGameCenter.signIn", "游戏中心🎮[签到失败]#" + (sb.length() > 0 ? sb.toString() : signResp));
               }
             }
           }
         }
       } catch (Throwable th) {
-        Log.runtime(TAG, "enableGameCenter.signIn err:");
-        Log.printStackTrace(TAG, th);
+        Log.printStackTrace(TAG, "enableGameCenter.signIn err:",th);
       }
 
       // 2. 查询任务列表,完成平台任务
@@ -1835,7 +1805,7 @@ public class AntMember extends ModelTask {
         JSONObject root = new JSONObject(resp);
         if (!ResChecker.checkRes(TAG, root)) {
           String msg = root.optString("errorMsg", root.optString("resultView", resp));
-          Log.record(TAG + ".enableGameCenter.tasks", "游戏中心🎮[任务列表查询失败]#" + msg);
+          Log.error(TAG + ".enableGameCenter.tasks", "游戏中心🎮[任务列表查询失败]#" + msg);
         } else {
           JSONObject data = root.optJSONObject("data");
           if (data != null) {
@@ -1889,7 +1859,7 @@ public class AntMember extends ModelTask {
                       JSONObject signUpJo = new JSONObject(signUpResp);
                       if (!ResChecker.checkRes(TAG, signUpJo)) {
                         String msg = signUpJo.optString("errorMsg", signUpJo.optString("resultView", signUpResp));
-                        Log.record(TAG + ".enableGameCenter.tasks", "游戏中心🎮任务[" + title + "]报名失败#" + msg);
+                        Log.error(TAG + ".enableGameCenter.tasks", "游戏中心🎮任务[" + title + "]报名失败#" + msg);
                         failed++;
                         continue;
                       }
@@ -1907,7 +1877,7 @@ public class AntMember extends ModelTask {
 
                       if ("SIGNUP_COMPLETE".equals(resultStatus) || "NOT_DONE".equals(resultStatus)) {
                         // 状态未变更,记为失败
-                        Log.record(TAG + ".enableGameCenter.tasks",
+                        Log.error(TAG + ".enableGameCenter.tasks",
                                 "游戏中心🎮任务[" + title + "]状态未变更,可能无法完成");
                         failed++;
                       } else {
@@ -1920,7 +1890,7 @@ public class AntMember extends ModelTask {
                       }
                     } else {
                       String msg = doJo.optString("errorMsg", doJo.optString("resultView", doResp));
-                      Log.record(TAG + ".enableGameCenter.tasks",
+                      Log.error(TAG + ".enableGameCenter.tasks",
                               "游戏中心🎮任务[" + title + "]完成失败#" + msg);
                       failed++;
                     }
@@ -1943,8 +1913,7 @@ public class AntMember extends ModelTask {
           }
         }
       } catch (Throwable th) {
-        Log.runtime(TAG, "enableGameCenter.tasks err:");
-        Log.printStackTrace(TAG, th);
+        Log.printStackTrace(TAG, "enableGameCenter.tasks err:",th);
       }
 
       // 3. 查询待收乐豆并使用一键收取接口
@@ -1953,7 +1922,7 @@ public class AntMember extends ModelTask {
         JSONObject root = new JSONObject(resp);
         if (!ResChecker.checkRes(TAG, root)) {
           String msg = root.optString("errorMsg", root.optString("resultView", resp));
-          Log.record(TAG + ".enableGameCenter.point", "游戏中心🎮[查询待收乐豆失败]#" + msg);
+          Log.error(TAG + ".enableGameCenter.point", "游戏中心🎮[查询待收乐豆失败]#" + msg);
         } else {
           JSONObject data = root.optJSONObject("data");
           JSONArray pointBallList = data != null ? data.optJSONArray("pointBallList") : null;
@@ -1974,13 +1943,12 @@ public class AntMember extends ModelTask {
               }
             } else {
               String msg = batchJo.optString("errorMsg", batchJo.optString("resultView", batchResp));
-              Log.record(TAG + ".enableGameCenter.point", "游戏中心🎮[一键领取乐豆失败]#" + msg);
+              Log.error(TAG + ".enableGameCenter.point", "游戏中心🎮[一键领取乐豆失败]#" + msg);
             }
           }
         }
       } catch (Throwable th) {
-        Log.runtime(TAG, "enableGameCenter.point err:");
-        Log.printStackTrace(TAG, th);
+        Log.printStackTrace(TAG, "enableGameCenter.point err:",th);
       }
 
     } catch (Throwable t) {
@@ -2011,12 +1979,10 @@ public class AntMember extends ModelTask {
           }
         }
       } catch (NullPointerException e) {
-        Log.error(TAG, "安心豆🫘[RPC桥接失败]#可能是RpcBridge未初始化");
-        Log.printStackTrace(TAG, e);
+        Log.printStackTrace(TAG, "安心豆🫘[RPC桥接失败]#可能是RpcBridge未初始化",e);
       }
     } catch (Throwable t) {
-      Log.runtime(TAG, "beanSignIn err:");
-      Log.printStackTrace(TAG, t);
+      Log.printStackTrace(TAG, "beanSignIn err:",t);
     }
   }
 
@@ -2062,12 +2028,10 @@ public class AntMember extends ModelTask {
           Log.runtime(jo.toString());
         }
       } catch (NullPointerException e) {
-        Log.error(TAG, "安心豆🫘[RPC桥接失败]#可能是RpcBridge未初始化");
-        Log.printStackTrace(TAG, e);
+        Log.printStackTrace(TAG, "安心豆🫘[RPC桥接失败]#可能是RpcBridge未初始化",e);
       }
     } catch (Throwable t) {
-      Log.runtime(TAG, "beanExchangeBubbleBoost err:");
-      Log.printStackTrace(TAG, t);
+      Log.printStackTrace(TAG, "beanExchangeBubbleBoost err:",t);
     }
   }
 
@@ -2119,13 +2083,13 @@ public class AntMember extends ModelTask {
                 break;
               }
             } else {
-              Log.record(TAG, "芝麻炼金失败: " + alchemyJo.optString("resultView"));
+              Log.error(TAG, "芝麻炼金失败: " + alchemyJo.optString("resultView"));
               break;
             }
           }
         }
       } else {
-        Log.record(TAG, "芝麻炼金首页查询失败");
+        Log.error(TAG, "芝麻炼金首页查询失败");
       }
 
       // ================= Step 2: 自动签到 & 时段奖励 =================
@@ -2150,7 +2114,7 @@ public class AntMember extends ModelTask {
                                   prize.optJSONObject("prize").optInt("num", 0) : 0) : 0;
                   Log.other("芝麻炼金⚗️[每日签到成功]#获得" + num + "粒");
                 } else {
-                  Log.runtime(TAG + ".doSesameAlchemy", "炼金签到失败:" + completeRes);
+                  Log.error(TAG + ".doSesameAlchemy", "炼金签到失败:" + completeRes);
                 }
               } catch (Throwable e) {
                 Log.printStackTrace(TAG + ".doSesameAlchemy.alchemyCheckInComplete", e);
@@ -2331,7 +2295,7 @@ public class AntMember extends ModelTask {
             int reward = task.optInt("rewardAmount", 0);
             Log.other("芝麻炼金⚗️[广告任务完成: " + title + "]#获得" + reward + "粒");
           } else {
-            Log.record(TAG, "芝麻炼金广告任务上报失败: " + title + " - " + adFinishRes);
+            Log.error(TAG, "芝麻炼金广告任务上报失败: " + title + " - " + adFinishRes);
           }
         } catch (Throwable e) {
           Log.printStackTrace(TAG + ".processAlchemyTasks.adTask", e);
@@ -2371,7 +2335,7 @@ public class AntMember extends ModelTask {
           Log.record(TAG, "任务领取成功: " + title);
           GlobalThreadPools.sleepCompat(1000);
         } else {
-          Log.record(TAG, "任务领取失败: " + title + " - " + joinJo.optString("resultView", joinRes));
+          Log.error(TAG, "任务领取失败: " + title + " - " + joinJo.optString("resultView", joinRes));
           continue;
         }
       }
@@ -2391,7 +2355,7 @@ public class AntMember extends ModelTask {
           int reward = task.optInt("rewardAmount", 0);
           Log.other("芝麻炼金⚗️[任务完成: " + title + "]#获得" + reward + "粒");
         } else {
-          Log.record(TAG, "任务提交失败: " + title + " - " + finishJo.optString("resultView", finishRes));
+          Log.error(TAG, "任务提交失败: " + title + " - " + finishJo.optString("resultView", finishRes));
         }
       }
       GlobalThreadPools.sleepCompat(2000);
@@ -2482,6 +2446,14 @@ public class AntMember extends ModelTask {
    */
   private void processSingleTask(JSONObject task) {
     try {
+
+
+      String sendCampTriggerType= task.optString("sendCampTriggerType");
+      if ("EVENT_TRIGGER".equals(sendCampTriggerType)) {
+        // 不处理事件触发类型的任务
+        return;
+      }
+
       JSONObject taskBaseInfo = task.optJSONObject("taskBaseInfo");
       if (taskBaseInfo == null) return;
 
@@ -2501,7 +2473,7 @@ public class AntMember extends ModelTask {
         return;
       }
 
-      // 解析奖励信息
+      // 解析奖励信息.
       String prizeName = getPrizeName(task);
 
       if ("NOT_DONE".equals(status) || "SIGNUP_COMPLETE".equals(status)) {
@@ -2650,7 +2622,7 @@ public class AntMember extends ModelTask {
         return;
       }
 
-      Log.forest("芝麻树🌳[开始净化] 可点击 " + clicks + " 次");
+      Log.record("芝麻树🌳[开始净化] 可点击 " + clicks + " 次");
 
       for (int i = 0; i < clicks; i++) {
         String res = AntMemberRpcCall.zhimaTreeCleanAndPush(treeCode);
@@ -2674,8 +2646,8 @@ public class AntMember extends ModelTask {
                 .optJSONObject("currentTreeInfo")
                 .optInt("scoreSummary", -1);
 
-        String log = "芝麻树🌳[净化成功] 第 " + (i + 1) + " 次 | 剩余: " + newScore + "g";
-        if (growth != -1) log += " | 成长值: " + growth;
+        String log = "芝麻树🌳[净化]第" + (i + 1) + "次 | 剩:" + newScore + "g";
+        if (growth != -1) log += "|成长:" + growth;
         Log.forest(log + " ✅");
 
         Thread.sleep(1500);
