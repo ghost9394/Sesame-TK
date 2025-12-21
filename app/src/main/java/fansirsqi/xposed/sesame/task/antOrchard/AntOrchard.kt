@@ -406,7 +406,7 @@ class AntOrchard : ModelTask() {
 
                 // 广告类任务：VISIT / XLIGHT
                 if (actionType == "VISIT"||actionType == "XLIGHT" ) {
-                    var rightsTimes = task.optInt("rightsTimes", 0)
+                    val rightsTimes = task.optInt("rightsTimes", 0)
                     var rightsTimesLimit = task.optInt("rightsTimesLimit", 0)
 
                     // 有些任务把次数放在 extend.rightsTimesLimit（字符串）里

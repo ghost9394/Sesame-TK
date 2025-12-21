@@ -17,7 +17,9 @@ object TaskBlacklist {
      */
     fun getBlacklist(): Set<String> {
         return try {
-            DataStore.getOrCreate(BLACKLIST_KEY, object : TypeReference<Set<String>>() {})
+            val storedBlacklist = DataStore.getOrCreate(BLACKLIST_KEY, object : TypeReference<Set<String>>() {})
+            // 合并存储的黑名单和默认黑名单
+            (storedBlacklist + defaultBlacklist).toSet()
         } catch (e: Exception) {
             Log.printStackTrace(TAG, "获取黑名单失败，使用默认黑名单", e)
             defaultBlacklist
@@ -38,56 +40,55 @@ object TaskBlacklist {
         }
     }
     
-    /**
-     * 检查任务是否在黑名单中（精确匹配）
-     * @param taskId 任务ID
-     * @return true表示在黑名单中，应该跳过
-     */
-    fun isTaskInBlacklist(taskId: String?): Boolean {
-        if (taskId == null) return false
-        val blacklist = getBlacklist()
-        return blacklist.contains(taskId)
-    }
+    
     
     /**
-     * 检查任务是否在黑名单中（模糊匹配，适用于芝麻信用任务）
-     * @param taskTitle 任务标题
+     * 检查任务是否在黑名单中（模糊匹配）
+     * @param taskInfo 任务信息（可以是任务ID、任务标题或组合信息）
      * @return true表示在黑名单中，应该跳过
      */
-    fun isTaskInBlacklistFuzzy(taskTitle: String?): Boolean {
-        if (taskTitle == null) return false
+    fun isTaskInBlacklist(taskInfo: String?): Boolean {
+        if (taskInfo == null) return false
         
         val blacklist = getBlacklist()
         return blacklist.any { blacklistItem -> 
-            taskTitle.contains(blacklistItem)
+            taskInfo.contains(blacklistItem) || blacklistItem.contains(taskInfo)
         }
     }
     
     /**
      * 添加任务到黑名单
      * @param taskId 要添加的任务ID
+     * @param taskTitle 任务标题（可选，用于模糊匹配）
      */
-    fun addToBlacklist(taskId: String) {
+    fun addToBlacklist(taskId: String, taskTitle: String = "") {
         if (taskId.isBlank()) return
-        
+        // 如果提供了任务标题，则将ID和标题组合后添加，支持模糊匹配
+        val blacklistItem = if (taskTitle.isNotBlank()) "$taskId$taskTitle" else taskId
         val currentBlacklist = getBlacklist().toMutableSet()
-        if (currentBlacklist.add(taskId)) {
+        if (currentBlacklist.add(blacklistItem)) {
             saveBlacklist(currentBlacklist)
-            Log.record(TAG, "任务[$taskId]已加入黑名单")
+            val displayInfo = if (taskTitle.isNotBlank()) "$taskId - $taskTitle" else taskId
+            Log.record(TAG, "任务[$displayInfo]已加入黑名单")
         }
     }
     
     /**
      * 从黑名单中移除任务
      * @param taskId 要移除的任务ID
+     * @param taskTitle 任务标题（可选，用于模糊匹配）
      */
-    fun removeFromBlacklist(taskId: String) {
+    fun removeFromBlacklist(taskId: String, taskTitle: String = "") {
         if (taskId.isBlank()) return
         
+        // 如果提供了任务标题，则将ID和标题组合后移除，支持模糊匹配
+        val blacklistItem = if (taskTitle.isNotBlank()) "$taskId$taskTitle" else taskId
+        
         val currentBlacklist = getBlacklist().toMutableSet()
-        if (currentBlacklist.remove(taskId)) {
+        if (currentBlacklist.remove(blacklistItem)) {
             saveBlacklist(currentBlacklist)
-            Log.record(TAG, "任务[$taskId]已从黑名单移除")
+            val displayInfo = if (taskTitle.isNotBlank()) "$taskId - $taskTitle" else taskId
+            Log.record(TAG, "任务[$displayInfo]已从黑名单移除")
         }
     }
     
@@ -105,29 +106,45 @@ object TaskBlacklist {
     
     /**
      * 根据错误码自动添加任务到黑名单
-     * @param taskId 任务ID
-     * @param taskTitle 任务标题（可选，用于日志）
-     * @param errorCode 错误码
+     * 当任务执行失败时，如果错误码属于预定义的无法恢复的错误类型，
+     * 系统会自动将该任务加入黑名单，避免重复执行失败的任务
+     * 
+     * @param taskId 任务ID，用于标识具体任务
+     * @param taskTitle 任务标题（可选），用于显示和模糊匹配
+     * @param errorCode 错误码，用于判断是否需要自动加入黑名单
      */
     fun autoAddToBlacklist(taskId: String, taskTitle: String = "", errorCode: String) {
+        // 参数校验：如果任务ID为空，直接返回
         if (taskId.isBlank()) return
-        
-        // 检查是否是应该自动加入黑名单的错误码
+        // 第一步：判断当前错误码是否需要自动加入黑名单
+        // 只有特定的、无法通过重试解决的错误才会自动加入黑名单
         val shouldAutoAdd = when (errorCode) {
-            "400000040" -> true // "不支持rpc调用" - 仅农场任务
-            "OP_REPEAT_CHECK", "ILLEGAL_ARGUMENT", "PROMISE_HAS_PROCESSING_TEMPLATE" -> true
-            else -> false
+            // 农场任务特有的错误：后端不支持RPC调用
+            "400000040" -> true
+            "CAMP_TRIGGER_ERROR", // 以下错误码都会导致任务自动加入黑名单：
+            "104",
+            "OP_REPEAT_CHECK",               // 操作频率过高，被系统限制
+            "ILLEGAL_ARGUMENT",              // 参数不合法或格式错误
+            "PROMISE_HAS_PROCESSING_TEMPLATE" -> true // 存在进行中的生活记录
+            else -> false                    // 其他错误码不自动加入黑名单
         }
         
+        // 第二步：如果确定需要自动加入黑名单
         if (shouldAutoAdd) {
-            addToBlacklist(taskId)
+            // 调用添加方法，将任务ID和标题组合后加入黑名单（支持模糊匹配）
+            addToBlacklist(taskId, taskTitle)
+            // 第三步：根据错误码生成用户友好的错误说明
             val reason = when (errorCode) {
                 "400000040" -> "不支持rpc调用"
+                "CAMP_TRIGGER_ERROR" -> "海豚活动触发错误"
                 "OP_REPEAT_CHECK" -> "操作太频繁"
                 "ILLEGAL_ARGUMENT" -> "参数错误"
-                "PROMISE_HAS_PROCESSING_TEMPLATE" -> "存在进行中的生活记录"
-                else -> "未知错误"
+                "104", "PROMISE_HAS_PROCESSING_TEMPLATE" -> "存在进行中的生活记录"
+                else -> "未知错误"  // 理论上不会执行到此处
             }
+            
+            // 第四步：生成日志信息并记录
+            // 优先显示完整信息（ID-标题），如果标题为空则只显示ID
             val taskInfo = if (taskTitle.isNotBlank()) "$taskId - $taskTitle" else taskId
             Log.record(TAG, "任务[$taskInfo]因$reason 自动加入黑名单")
         }

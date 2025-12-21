@@ -4,7 +4,6 @@ package fansirsqi.xposed.sesame.task.antFarm
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import fansirsqi.xposed.sesame.data.Status
@@ -670,6 +669,7 @@ class AntFarm : ModelTask() {
                 tc.countDebug("每日捐蛋")
             }
 
+
             // 做饲料任务
             if (doFarmTask!!.value) {
                 // 检查是否到达执行时间
@@ -1194,7 +1194,7 @@ class AntFarm : ModelTask() {
                             // 刷新状态
                             syncAnimalStatus(ownerFarmId)
                         }
-                        handleAutoFeedAnimal()
+                        //handleAutoFeedAnimal()
                     }
                 }
             } catch (e: Exception) {
@@ -1814,79 +1814,104 @@ class AntFarm : ModelTask() {
     private suspend fun doFarmTasks() {
         try {
             val jo = JSONObject(AntFarmRpcCall.listFarmTask())
-            if (ResChecker.checkRes(TAG, jo)) {
-                val farmTaskList = jo.getJSONArray("farmTaskList")
-                for (i in 0..<farmTaskList.length()) {
-                    val task = farmTaskList.getJSONObject(i)
-                    val title = task.optString("title", "未知任务")
-                    val taskStatus = task.getString("taskStatus")
-                    val bizKey = task.getString("bizKey")
-                    task.optString("taskMode")
-                    // 跳过已被屏蔽的任务
-                    if (TaskBlacklist.isTaskInBlacklist(bizKey)) continue
+            if (!ResChecker.checkRes(TAG, jo)) return
 
-                    // 跳过今日已达上限的任务
-                    if (Status.hasFlagToday("farm::task::limit::$bizKey")) {
-                        Log.record("庄园任务[$title]今日已达上限，跳过执行")
-                        continue
-                    }
+            val farmTaskList = jo.getJSONArray("farmTaskList")
+            for (i in 0 until farmTaskList.length()) {
+                val task = farmTaskList.getJSONObject(i)
+                val title = task.optString("title", "未知任务")
+                val taskStatus = task.getString("taskStatus")
+                val bizKey = task.getString("bizKey")
 
-                    if (TaskStatus.TODO.name == taskStatus) {
-                        if ("VIDEO_TASK" == bizKey) {
-                                val taskVideoDetailjo =
-                                    JSONObject(AntFarmRpcCall.queryTabVideoUrl())
-                                if (ResChecker.checkRes(TAG, taskVideoDetailjo)) {
-                                    val videoUrl = taskVideoDetailjo.getString("videoUrl")
-                                    val contentId = videoUrl.substring(
-                                        videoUrl.indexOf("&contentId=") + 11,
-                                        videoUrl.indexOf("&refer")
-                                    )
-                                    val videoDetailjo =
-                                        JSONObject(AntFarmRpcCall.videoDeliverModule(contentId))
-                                    if (ResChecker.checkRes(TAG, videoDetailjo)) {
-                                        delay(15 * 1000L)
-                                        val resultVideojo =
-                                            JSONObject(AntFarmRpcCall.videoTrigger(contentId))
-                                        if (ResChecker.checkRes(TAG, resultVideojo)) {
-                                            Log.farm("庄园任务1🧾[$title]")
-                                        }
-                                    }
-                                } else {
-                                    val taskDetailResult = AntFarmRpcCall.doFarmTask(bizKey)
-                                    if (taskDetailResult.isNullOrEmpty()) {
-                                    //     Log.error(TAG, "庄园任务[$title]执行失败：API返回空结果")
-                                        return
-                                    }
-                                    val taskDetailjo = JSONObject(taskDetailResult)
-                                    if (ResChecker.checkRes(TAG, taskDetailjo)) {
-                                        Log.farm("庄园任务2🧾[$title]")
-                                    } else {
-                                        val resultCode = taskDetailjo.optString("resultCode", "")
-                                        if (resultCode == "309") {
-                                            // 任务达到当日上限，标记今日不再执行
-                                            Status.setFlagToday("farm::task::limit::$bizKey")
-                                            Log.record(TAG, "庄园任务[$title]今日已达上限，跳过后续执行")
-                                        } else {
-                                            // 其他错误，使用统一黑名单管理器自动处理
-                                            Log.error("庄园任务失败：$title\n$taskDetailjo")
-                                            TaskBlacklist.autoAddToBlacklist(bizKey, title, resultCode)
-                                        }
-                                    }
-                                }
+                val taskMode = task.optString("taskMode")
+                if(taskMode=="TRIGGER")     continue                 //跳过事件任务
+
+                // 1. 预检查：黑名单与每日上限
+                // 检查任务标题和业务键是否在黑名单中
+                val titleInBlacklist = TaskBlacklist.isTaskInBlacklist(title)
+                val bizKeyInBlacklist = TaskBlacklist.isTaskInBlacklist(bizKey)
+                //   Log.record(TAG, "庄园任务检查 - 标题: $title, 业务键: $bizKey, 标题在黑名单: $titleInBlacklist, 业务键在黑名单: $bizKeyInBlacklist")
+                if (titleInBlacklist || bizKeyInBlacklist) {
+                    //      Log.record(TAG, "跳过黑名单任务: $title ($bizKey)")
+                    continue
+                }
+                if (Status.hasFlagToday("farm::task::limit::$bizKey")) continue
+
+                // 2. 执行 TODO 任务
+                if (TaskStatus.TODO.name == taskStatus) {
+                    when (bizKey) {
+                        "VIDEO_TASK" -> {
+                            // --- 视频任务专项逻辑 ---
+                            handleVideoTask(bizKey, title)
+                        }
+                        "ANSWER" -> {
+                            // --- 答题任务专项逻辑 ---
+                            if (!Status.hasFlagToday(CACHED_FLAG)) {
+                                answerQuestion("100")
+                            }
+                        }
+                        else -> {
+                            // --- 普通任务通用逻辑 ---
+                            handleGeneralTask(bizKey, title)
                         }
                     }
-                    if ("ANSWER" == bizKey && !Status.hasFlagToday(CACHED_FLAG)) { //单独处理答题任务
-                        answerQuestion("100") //答题
-                    }
-                    delay(1000)
                 }
+
+                // 3. 额外处理某些即便不是 TODO 状态也可能需要检查的任务（如答题补漏）
+                if ("ANSWER" == bizKey && !Status.hasFlagToday(CACHED_FLAG)) {
+                    answerQuestion("100")
+                }
+
+                delay(1000) // 任务间间隔，防止频率过快
             }
         } catch (e: CancellationException) {
-            // 协程取消异常必须重新抛出，不能吞掉
-            Log.debug(TAG, "doFarmTasks 协程被取消")
             throw e
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "doFarmTasks 错误:", t)
+        }
+    }
+
+    // 抽取视频处理逻辑，避免嵌套过深
+    private suspend fun handleVideoTask(bizKey: String, title: String) {
+        val res = AntFarmRpcCall.queryTabVideoUrl()
+        val jo = JSONObject(res)
+        if (ResChecker.checkRes(TAG, jo)) {
+            val videoUrl = jo.getString("videoUrl")
+            // 建议增加 contentId 提取的安全性检查
+            try {
+                val contentId = videoUrl.substring(
+                    videoUrl.indexOf("&contentId=") + 11,
+                    videoUrl.indexOf("&refer")
+                )
+                if (ResChecker.checkRes(TAG, JSONObject(AntFarmRpcCall.videoDeliverModule(contentId)))) {
+                    delay(15000L) // 模拟观看视频
+                    if (ResChecker.checkRes(TAG, JSONObject(AntFarmRpcCall.videoTrigger(contentId)))) {
+                        Log.farm("庄园视频任务确认成功🧾[$title]")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.error(TAG, "解析视频ID失败: $title")
+            }
+        }
+    }
+
+    // 抽取通用任务处理逻辑
+    private suspend fun handleGeneralTask(bizKey: String, title: String) {
+        val result = AntFarmRpcCall.doFarmTask(bizKey)
+        if (result.isNullOrEmpty()) return
+
+        val jo = JSONObject(result)
+        if (ResChecker.checkRes(TAG, jo)) {
+            Log.farm("庄园任务完成🧾[$title]")
+        } else {
+            val resultCode = jo.optString("resultCode", "")
+            if (resultCode == "309") {
+                Status.setFlagToday("farm::task::limit::$bizKey")
+                Log.record(TAG, "庄园任务[$title]已达上限")
+            } else {
+                Log.error("庄园任务失败：$title code:$resultCode")
+                TaskBlacklist.autoAddToBlacklist(bizKey, title, resultCode)
+            }
         }
     }
 
@@ -2016,7 +2041,8 @@ class AntFarm : ModelTask() {
             }
 
             if (foodStock < 180) {
-                Log.record(TAG, "喂鸡饲料不足")
+                Log.record(TAG, "喂鸡饲料不足，停止本次投喂尝试")
+                return false // 明确返回 false
             } else {
                 val jo = JSONObject(AntFarmRpcCall.feedAnimal(farmId))
                 if (ResChecker.checkRes(TAG, jo)) {

@@ -28,6 +28,7 @@ import fansirsqi.xposed.sesame.model.modelFieldExt.ChoiceModelField;
 import fansirsqi.xposed.sesame.model.modelFieldExt.IntegerModelField;
 import fansirsqi.xposed.sesame.model.modelFieldExt.SelectModelField;
 import fansirsqi.xposed.sesame.model.modelFieldExt.StringModelField;
+import fansirsqi.xposed.sesame.newutil.TaskBlacklist;
 import fansirsqi.xposed.sesame.task.ModelTask;
 import fansirsqi.xposed.sesame.task.TaskCommon;
 import fansirsqi.xposed.sesame.util.GlobalThreadPools;
@@ -68,8 +69,6 @@ public class AntSports extends ModelTask {
     // 记录训练好友获得0金币的次数
     private int zeroTrainCoinCount = 0;
 
-    // 运动任务黑名单
-    private StringModelField sportsTaskBlacklist;
 
     //健康岛任务
     private BooleanModelField neverlandTask;  //健康岛任务
@@ -205,12 +204,15 @@ public class AntSports extends ModelTask {
                 }));
             }
 
-            if (sportsTasks.getValue()) {
+            // 运动任务
+            if (!Status.hasFlagToday("sport::dailyTasks") && sportsTasks.getValue()) {
                 // 先执行原有运动任务面板逻辑
                 sportsTasks();
-                // 再处理首页推荐能量球对应的任务
-                sportsEnergyBubbleTask();
+                Status.setFlagToday("sport::dailyTasks");
             }
+
+            // 运动球任务
+            sportsEnergyBubbleTask();
 
             ClassLoader loader = ApplicationHook.getClassLoader();
 
@@ -255,32 +257,6 @@ public class AntSports extends ModelTask {
             Log.printStackTrace(TAG, t);
         } finally {
             Log.record(TAG, "执行结束-" + getName());
-        }
-    }
-
-    private void coinExchangeItem(String itemId) {
-        try {
-            JSONObject jo = new JSONObject(AntSportsRpcCall.queryItemDetail(itemId));
-            if (!ResChecker.checkRes(TAG + "查询商品详情失败:", jo)) {
-                return;
-            }
-            jo = jo.getJSONObject("data");
-            if (!"OK".equals(jo.optString("exchangeBtnStatus"))) {
-                return;
-            }
-            jo = jo.getJSONObject("itemBaseInfo");
-            String itemTitle = jo.getString("itemTitle");
-            int valueCoinCount = jo.getInt("valueCoinCount");
-            jo = new JSONObject(AntSportsRpcCall.exchangeItem(itemId, valueCoinCount));
-            if (!ResChecker.checkRes(TAG + "兑换商品失败:", jo)) {
-                return;
-            }
-            jo = jo.getJSONObject("data");
-            if (jo.optBoolean("exgSuccess")) {
-                Log.other(TAG, "运动好礼🎐兑换[" + itemTitle + "]花费" + valueCoinCount + "运动币");
-            }
-        } catch (Throwable t) {
-            Log.printStackTrace(TAG, "trainMember err:",t);
         }
     }
 
@@ -500,10 +476,12 @@ public class AntSports extends ModelTask {
                 }
 
                 // 只处理有 channel 字段的记录（广告任务），引导/订阅等不处理
+                String id=bubble.optString("id");
                 String taskId = bubble.optString("channel", "");
                 if (taskId.isEmpty()) {
                     continue;
                 }
+                if(TaskBlacklist.INSTANCE.isTaskInBlacklist(id)) continue;
 
                 String sourceName = bubble.optString("simpleSourceName", "");
                 int coinAmount = bubble.optInt("coinAmount", 0);
@@ -524,11 +502,15 @@ public class AntSports extends ModelTask {
                 } else {
                     String errorCode = completeRes.optString("errorCode", "");
                     String errorMsg = completeRes.optString("errorMsg", "");
-                    Log.error(TAG, "运动球任务❌[" + sourceName + "]#" + completeRes+" 任务："+bubble);
+                    Log.error(TAG, "运动球任务❌[" + sourceName + "]#" + completeRes+" 任务："+ bubble);
+
+                    if(!id.isEmpty()) {
+                        TaskBlacklist.INSTANCE.addToBlacklist(id,sourceName);
+                    }
                 }
 
                 // 每处理一个任务随机休息 1-3 秒
-                int sleepMs = RandomUtil.nextInt(1000, 3000);
+                int sleepMs = RandomUtil.nextInt(10000, 30000);
                 GlobalThreadPools.sleepCompat(sleepMs);
             }
 

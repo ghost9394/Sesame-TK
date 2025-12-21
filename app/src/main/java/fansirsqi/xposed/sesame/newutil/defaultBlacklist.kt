@@ -4,11 +4,8 @@ package fansirsqi.xposed.sesame.newutil
  * 默认黑名单列表（包含常见无法完成的任务）
  *
  * 使用方法：
- * 1. 检查任务是否在黑名单中（精确匹配）：
- *    if (TaskBlacklist.isTaskInBlacklist(taskId)) { 跳过任务 }
- *
- * 2. 检查任务是否在黑名单中（模糊匹配，适用于芝麻信用任务）：
- *    if (TaskBlacklist.isTaskInBlacklistFuzzy(taskTitle)) { 跳过任务 }
+ * 1. 检查任务是否在黑名单中（模糊匹配）：
+ *    if (TaskBlacklist.isTaskInBlacklist(taskInfo)) { 跳过任务 }
  *
  * 3. 根据错误码自动添加任务到黑名单：
  *    TaskBlacklist.autoAddToBlacklist(taskId, taskTitle, errorCode)
@@ -81,9 +78,9 @@ val defaultBlacklist = setOf(
     "ORCHARD_NORMAL_AQ_XIAZAI",     // 下载AQ
     
     // 庄园任务
-    "HEART_DONATION_ADVANCED_FOOD_V2",  //香草芒果冰糕任务
+    "HEART_DONATION_ADVANCED_FOOD_V2",  //去买秋天第一杯奶茶
     "HEART_DONATE",  //爱心捐赠
-    "SHANGOU_xiadan",  //去买秋天第一杯奶茶
+    "SHANGOU_xiadan",  //逛闪购外卖1元起吃
     "OFFLINE_PAY",  //到店付款,线下支付
     "ONLINE_PAY",  //在线支付
     "HUABEI_MAP_180" //用花呗完成一笔支付

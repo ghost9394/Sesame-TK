@@ -1,5 +1,6 @@
 package fansirsqi.xposed.sesame.entity
 
+import fansirsqi.xposed.sesame.hook.SecurityBodyHelper
 import lombok.Getter
 import org.json.JSONException
 import org.json.JSONObject
@@ -62,14 +63,18 @@ class RpcEntity @JvmOverloads constructor(
             val jo = JSONObject()
             jo.put("__apiCallStartTime", System.currentTimeMillis())
             // [__apiNativeCallId]不传是否有影响，取值又如何获取
-            jo.put("apiCallLink", "XRiverNotFound")
+         //   jo.put("apiCallLink", "XRiverNotFound")
             jo.put("appName", this.appName)
-            jo.put("execEngine", "XRiver")
+          //  jo.put("execEngine", "XRiver")
+            jo.put("__apiNativeCallId", "native_" + (100..2000).random())
             jo.put("facadeName", this.facadeName)
             jo.put("methodName", this.methodName)
             jo.put("operationType", this.requestMethod)
             jo.put("requestData", this.requestData)
             jo.put("relationLocal", this.requestRelation)
+            jo.put("wua", SecurityBodyHelper.getSecurityBodyData(4).toString())
+            jo.put("useWua", true)
+            jo.put("disableLimitView", true)
             return jo.toString()
         }
 }

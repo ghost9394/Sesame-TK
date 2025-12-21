@@ -17,7 +17,7 @@ import fansirsqi.xposed.sesame.model.ModelGroup
 import fansirsqi.xposed.sesame.model.modelFieldExt.BooleanModelField
 import fansirsqi.xposed.sesame.model.modelFieldExt.SelectModelField
 import fansirsqi.xposed.sesame.newutil.TaskBlacklist.autoAddToBlacklist
-import fansirsqi.xposed.sesame.newutil.TaskBlacklist.isTaskInBlacklistFuzzy
+import fansirsqi.xposed.sesame.newutil.TaskBlacklist.isTaskInBlacklist
 import fansirsqi.xposed.sesame.task.ModelTask
 import fansirsqi.xposed.sesame.task.TaskCommon
 import fansirsqi.xposed.sesame.task.antOrchard.AntOrchardRpcCall.orchardSpreadManure
@@ -1917,7 +1917,7 @@ class AntMember : ModelTask() {
             if (finishFlag) continue
 
             // 使用TaskBlacklist进行黑名单检查
-            if (isTaskInBlacklistFuzzy(title)) {
+            if (isTaskInBlacklist(title)) {
                 Log.record(TAG, "跳过黑名单任务: $title")
                 continue
             }
@@ -2418,7 +2418,7 @@ class AntMember : ModelTask() {
          * @return true表示在黑名单中，应该跳过
          */
         private fun isTaskInBlacklist(taskTitle: String?): Boolean {
-            return isTaskInBlacklistFuzzy(taskTitle)
+            return fansirsqi.xposed.sesame.newutil.TaskBlacklist.isTaskInBlacklist(taskTitle)
         }
 
         /**

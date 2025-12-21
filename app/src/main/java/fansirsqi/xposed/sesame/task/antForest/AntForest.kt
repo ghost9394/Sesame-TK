@@ -310,14 +310,6 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                 false
             ).also { closeWhackMole = it })
         modelFields.addField(
-            IntegerModelField(
-                "whackMoleHits",
-                "🎮 6秒拼手速 | 击打每局地鼠的次数",
-                1,
-                0,
-                15
-            ).also { AntForest.whackMoleHits = it })
-        modelFields.addField(
             BooleanModelField(
                 "energyRain",
                 "能量雨 | 开关",
@@ -4474,8 +4466,7 @@ private fun useShieldCard(bagObject: JSONObject?) {
         private const val SHIELD_RENEW_THRESHOLD_HHMM = 2359
         var giveEnergyRainList: SelectModelField? = null //能量雨赠送列表
         var medicalHealthOption: SelectModelField? = null //医疗健康选项
-        var whackMoleHits: IntegerModelField? = null //6秒拼手速击打次数
-        var ecoLifeOption: SelectModelField? = null
+         var ecoLifeOption: SelectModelField? = null
 
         /**
          * 异常返回检测开关
