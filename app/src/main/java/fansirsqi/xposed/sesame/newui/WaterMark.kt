@@ -166,7 +166,7 @@ class WatermarkView(context: Context) : View(context) {
 
         /** 模块版本和构建时间的固定信息行 */
         private val versionLines = listOf(
-            "版本信息: ${BuildConfig.VERSION}.${BuildConfig.BUILD_TYPE} 📦",
+            "版本信息: ${BuildConfig.VERSION_NAME}.${BuildConfig.BUILD_TYPE} 📦",
             "构建时间: ${BuildConfig.BUILD_DATE} ${BuildConfig.BUILD_TIME} ⏰"
         )
     }

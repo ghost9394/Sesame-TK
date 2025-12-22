@@ -55,16 +55,10 @@ android {
         }
 
         versionCode = gitCommitCount
-        val buildTag = "realese"
-//        versionName = "v0.4.3.rc$gitCommitCount-$buildTag"
-        versionName = "v0.4.4"
+        versionName = "0.4.4"
 
         buildConfigField("String", "BUILD_DATE", "\"$buildDate\"")
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
-        buildConfigField("String", "BUILD_NUMBER", "\"$buildTargetCode\"")
-        buildConfigField("String", "BUILD_TAG", "\"$buildTag\"")
-        buildConfigField("String", "VERSION", "\"$versionName\"")
-
         if (isCIBuild) {
             ndk {
                 abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))

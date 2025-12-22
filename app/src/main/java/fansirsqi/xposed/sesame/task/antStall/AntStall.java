@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
+
+import fansirsqi.xposed.sesame.data.StatusFlags;
 import fansirsqi.xposed.sesame.entity.AlipayUser;
 import fansirsqi.xposed.sesame.model.BaseModel;
 import fansirsqi.xposed.sesame.model.ModelFields;
@@ -901,16 +903,16 @@ public class AntStall extends ModelTask {
                 }
                 hasNewVillage = true;
                 String villageName = road.getString("villageName");
-                
+
                 // 检查今日是否已进入过这个村庄
                 String flagKey = "stall::roadmap::" + villageName;
                 if (Status.hasFlagToday(flagKey)) {
                     Log.record(TAG, "今日已进入[" + villageName + "]，跳过重复打印。");
                     continue;
                 }
-                
+
                 Log.farm("蚂蚁新村⛪[进入:" + villageName + "]成功");
-                
+
                 // 标记今日已进入该村庄，避免重复打印
                 Status.setFlagToday(flagKey);
                 break; // 进入一个新村后退出循环
@@ -947,15 +949,34 @@ public class AntStall extends ModelTask {
         }
     }
 
+
+
     private void throwManure(JSONArray dynamicList) {
+        // 1. 前置检查：如果今日已达上限，直接跳过
+        if (Status.hasFlagToday(StatusFlags.FLAG_ANTSTALL_THROW_MANURE_LIMIT)) {
+            return;
+        }
+
         try {
             String s = AntStallRpcCall.throwManure(dynamicList);
             JSONObject jo = new JSONObject(s);
-            if (ResChecker.checkRes(TAG,jo)) {
-                Log.farm("蚂蚁新村⛪扔肥料");
+
+            // 2. 先于 ResChecker 判断特定业务错误码
+            String resultCode = jo.optString("resultCode");
+            if ("B_OVER_LIMIT_COUNT_OF_THROW_TO_FRIEND".equals(resultCode)) {
+                Log.record(TAG, "检测到今日丢肥料次数已达上限，停止后续尝试");
+                Status.setFlagToday(StatusFlags.FLAG_ANTSTALL_THROW_MANURE_LIMIT);
+                return; // 既然已经上限，直接返回，不再走 ResChecker
             }
+
+            // 3. 正常的响应检查（处理 success: true/false）
+            if (ResChecker.checkRes(TAG, jo)) {
+                Log.farm("蚂蚁新村⛪扔肥料成功");
+            }
+
         } catch (Throwable th) {
-            Log.printStackTrace(TAG, "throwManure err:",th);
+            // 这样即使 ResChecker 抛出异常，th 也能捕获到，但我们上面的 return 已经避开了大部分情况
+            Log.printStackTrace(TAG, "throwManure err:", th);
         } finally {
             try {
                 GlobalThreadPools.sleepCompat(1000);
@@ -1000,10 +1021,12 @@ public class AntStall extends ModelTask {
             } else {
                 Log.error(TAG,"throwManure err:" + " " + s);
             }
+
         } catch (Throwable t) {
             Log.printStackTrace(TAG,"throwManure err:", t);
         }
     }
+
 
     private void settleReceivable() {
         String s = AntStallRpcCall.settleReceivable();

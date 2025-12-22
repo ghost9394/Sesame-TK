@@ -123,7 +123,7 @@ object DeviceInfoUtil {
             "Android Version" to "${Build.VERSION.RELEASE} SDK (${Build.VERSION.SDK_INT})",
             "OS Build" to "${Build.DISPLAY}",
             "Verify ID" to vid,
-            "Module Version" to "${BuildConfig.VERSION}.${BuildConfig.BUILD_TYPE} 📦",
+            "Module Version" to "v${BuildConfig.VERSION_NAME}.${BuildConfig.BUILD_TYPE} 📦",
             "Module Build" to "${BuildConfig.BUILD_DATE} ${BuildConfig.BUILD_TIME} ⏰"
         )
     }

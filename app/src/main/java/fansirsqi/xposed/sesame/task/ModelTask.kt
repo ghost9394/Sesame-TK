@@ -11,6 +11,7 @@ import fansirsqi.xposed.sesame.util.StringUtil
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -180,17 +181,27 @@ abstract class ModelTask : Model() {
     }
 
     /**
-     * 添加子任务
-     * 此方法专为Java代码调用设计，自动处理协程上下文
-     * @param childTask 要添加的子任务
-     * @return 是否添加成功，始终返回true
+     * 添加子任务（Java/Kotlin通用入口）
+     * 
+     * **示例用法：**
+     * ```kotlin
+     * // Kotlin挂起函数
+     * addChildTask(ChildModelTask("task1", "GROUP") {
+     *     delay(1000)
+     *     Log.record("执行成功")
+     * }, execTime = System.currentTimeMillis() + 5000)
+     * 
+     * // Java Runnable
+     * addChildTask(new ChildModelTask("task2", "GROUP", () -> {
+     *     Log.record("Java任务");
+     * }, System.currentTimeMillis() + 3000))
+     * ```
+     * 
+     * @return 始终返回true
      */
     fun addChildTask(childTask: ChildModelTask): Boolean {
-        // 确保任务作用域已初始化
         ensureTaskScope()
-        // 优化：使用 UNDISPATCHED 启动模式减少协程调度开销
-        // UNDISPATCHED 会立即在当前线程开始执行，直到第一个挂起点
-        taskScope!!.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+        taskScope!!.launch(start = CoroutineStart.UNDISPATCHED) {
             addChildTaskSuspend(childTask)
         }
         return true

@@ -32,7 +32,6 @@ public final class StatusFlags {
     // --------------------------------------------
     public static final String FLAG_ANTSPORTS_TASKCENTER_DONE = "Flag_AntSports_TaskCenter_Done";
 
-
     // --------------------------------------------
     // 芝麻粒炼金 次日奖励标记
     // --------------------------------------------
@@ -47,5 +46,13 @@ public final class StatusFlags {
     // 农场 浇水次数
     // --------------------------------------------
     public static final String FLAG_ANTORCHARD_SpreadManure_Count = "FLAG_Antorchard_SpreadManure_Count";
+
+    // --------------------------------------------
+    // 信用2101 图鉴任务是否全部完成
+    // --------------------------------------------
+    public static final String FLAG_Credit2101_ChapterTask_Done = "FLAG_Credit2101_ChapterTask_Done";
+
+    // 蚂蚁新村-今日丢肥料是否已达上限
+    public static final String FLAG_ANTSTALL_THROW_MANURE_LIMIT = "Flag_AntStall_Throw_Manure_Limit";
 
 }
