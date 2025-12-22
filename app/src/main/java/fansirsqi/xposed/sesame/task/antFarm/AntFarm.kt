@@ -29,7 +29,6 @@ import fansirsqi.xposed.sesame.newutil.TaskBlacklist
 import fansirsqi.xposed.sesame.task.AnswerAI.AnswerAI
 import fansirsqi.xposed.sesame.task.ModelTask
 import fansirsqi.xposed.sesame.task.TaskCommon
-import fansirsqi.xposed.sesame.task.TaskStatus
 import fansirsqi.xposed.sesame.task.antFarm.AntFarmFamily.familyClaimRewardList
 import fansirsqi.xposed.sesame.task.antFarm.AntFarmFamily.familySign
 import fansirsqi.xposed.sesame.task.antForest.TaskTimeChecker
@@ -1815,7 +1814,6 @@ class AntFarm : ModelTask() {
         try {
             val jo = JSONObject(AntFarmRpcCall.listFarmTask())
             if (!ResChecker.checkRes(TAG, jo)) return
-
             val farmTaskList = jo.getJSONArray("farmTaskList")
             for (i in 0 until farmTaskList.length()) {
                 val task = farmTaskList.getJSONObject(i)
@@ -1823,25 +1821,26 @@ class AntFarm : ModelTask() {
                 val taskStatus = task.getString("taskStatus")
                 val bizKey = task.getString("bizKey")
 
-                val taskMode = task.optString("taskMode")
-                if(taskMode=="TRIGGER")     continue                 //跳过事件任务
+              //  val taskMode = task.optString("taskMode")
+              //  if(taskMode=="TRIGGER")     continue                 //跳过事件任务
 
                 // 1. 预检查：黑名单与每日上限
                 // 检查任务标题和业务键是否在黑名单中
                 val titleInBlacklist = TaskBlacklist.isTaskInBlacklist(title)
                 val bizKeyInBlacklist = TaskBlacklist.isTaskInBlacklist(bizKey)
-                //   Log.record(TAG, "庄园任务检查 - 标题: $title, 业务键: $bizKey, 标题在黑名单: $titleInBlacklist, 业务键在黑名单: $bizKeyInBlacklist")
+                    Log.debug(TAG, "庄园任务检查 - 标题: $title, 业务键: $bizKey, 标题在黑名单: $titleInBlacklist, 业务键在黑名单: $bizKeyInBlacklist")
                 if (titleInBlacklist || bizKeyInBlacklist) {
-                    //      Log.record(TAG, "跳过黑名单任务: $title ($bizKey)")
+                    Log.debug(TAG, "跳过黑名单任务: $title ($bizKey)")
                     continue
                 }
-                if (Status.hasFlagToday("farm::task::limit::$bizKey")) continue
 
+                if (Status.hasFlagToday("farm::task::limit::$bizKey")) continue
                 // 2. 执行 TODO 任务
                 if (TaskStatus.TODO.name == taskStatus) {
                     when (bizKey) {
                         "VIDEO_TASK" -> {
                             // --- 视频任务专项逻辑 ---
+                            Log.record(TAG, "开始处理视频任务: $title ($bizKey)")
                             handleVideoTask(bizKey, title)
                         }
                         "ANSWER" -> {
@@ -1852,17 +1851,18 @@ class AntFarm : ModelTask() {
                         }
                         else -> {
                             // --- 普通任务通用逻辑 ---
+                            Log.record(TAG, "开始处理庄园任务: $title ($bizKey)")
                             handleGeneralTask(bizKey, title)
                         }
                     }
+                }else{
+                    Log.debug(TAG, "跳过非TODO任务: $title ($bizKey) 状态: $taskStatus")
                 }
-
                 // 3. 额外处理某些即便不是 TODO 状态也可能需要检查的任务（如答题补漏）
                 if ("ANSWER" == bizKey && !Status.hasFlagToday(CACHED_FLAG)) {
                     answerQuestion("100")
                 }
-
-                delay(1000) // 任务间间隔，防止频率过快
+                delay(2000) // 任务间间隔，防止频率过快
             }
         } catch (e: CancellationException) {
             throw e
@@ -1896,7 +1896,7 @@ class AntFarm : ModelTask() {
     }
 
     // 抽取通用任务处理逻辑
-    private suspend fun handleGeneralTask(bizKey: String, title: String) {
+    private fun handleGeneralTask(bizKey: String, title: String) {
         val result = AntFarmRpcCall.doFarmTask(bizKey)
         if (result.isNullOrEmpty()) return
 

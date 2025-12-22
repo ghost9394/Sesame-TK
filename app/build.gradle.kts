@@ -75,6 +75,7 @@ android {
 
 
     buildFeatures {
+        viewBinding = true
         buildConfig = true
         compose = true
     }
@@ -150,11 +151,13 @@ dependencies {
     // Compose 相关依赖 - 现代化 UI 框架
     val composeBom = platform("androidx.compose:compose-bom:2025.12.00")  // Compose BOM 版本管理
     implementation(composeBom)
+
     testImplementation(composeBom)
     androidTestImplementation(composeBom)
     implementation(libs.androidx.material3)                // Material 3 设计组件
     implementation(libs.androidx.ui.tooling.preview)              // UI 工具预览
     debugImplementation(libs.androidx.ui.tooling)                 // 调试时的 UI 工具
+    implementation(libs.androidx.material.icons.extended)         // Material 3 图标
 
     // 生命周期和数据绑定
     implementation(libs.androidx.lifecycle.viewmodel.compose) // Compose ViewModel 支持

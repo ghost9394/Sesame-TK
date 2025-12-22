@@ -27,9 +27,10 @@ import fansirsqi.xposed.sesame.model.modelFieldExt.ChoiceModelField;
 import fansirsqi.xposed.sesame.model.modelFieldExt.SelectAndCountModelField;
 import fansirsqi.xposed.sesame.model.modelFieldExt.SelectModelField;
 import fansirsqi.xposed.sesame.newutil.DataStore;
+import fansirsqi.xposed.sesame.newutil.TaskBlacklist;
 import fansirsqi.xposed.sesame.task.ModelTask;
 import fansirsqi.xposed.sesame.task.TaskCommon;
-import fansirsqi.xposed.sesame.task.TaskStatus;
+import fansirsqi.xposed.sesame.task.antFarm.TaskStatus;
 import fansirsqi.xposed.sesame.task.antForest.AntForestRpcCall;
 import fansirsqi.xposed.sesame.util.GlobalThreadPools;
 import fansirsqi.xposed.sesame.util.Log;
@@ -641,15 +642,6 @@ public class AntOcean extends ModelTask {
 
     private void receiveTaskAward() {
         try {
-            Set<String> presetBad = new LinkedHashSet<>(List.of("DEMO", "DEMO1"));
-
-            TypeReference<Set<String>> typeRef = new TypeReference<>() {
-            };
-            Set<String> badTaskSet = DataStore.INSTANCE.getOrCreate("badOceanTaskSet", typeRef);
-            if (badTaskSet.isEmpty()) {
-                badTaskSet.addAll(presetBad);
-                DataStore.INSTANCE.put("badOceanTaskSet", badTaskSet);
-            }
             while (true) {
                 boolean done = false;
                 String s = AntOceanRpcCall.queryTaskList();
@@ -666,6 +658,7 @@ public class AntOcean extends ModelTask {
                     String sceneCode = task.getString("sceneCode");
                     String taskType = task.getString("taskType");
                     String taskStatus = task.getString("taskStatus");
+
                     if (TaskStatus.FINISHED.name().equals(taskStatus)) {
                         JSONObject joAward = new JSONObject(AntOceanRpcCall.receiveTaskAward(sceneCode, taskType));
                         if (ResChecker.checkRes(TAG, joAward)) {
@@ -675,8 +668,8 @@ public class AntOcean extends ModelTask {
                             Log.error(TAG, "海洋奖励🌊领取失败：" + joAward);
                         }
                     } else if (TaskStatus.TODO.name().equals(taskStatus)) {
-                        // 在处理任何任务前，先检查黑名单
-                        if (badTaskSet.contains(taskTitle)) {
+                        // 使用通用黑名单检查任务是否在黑名单中
+                        if (TaskBlacklist.INSTANCE.isTaskInBlacklist(taskTitle)) {
                             Log.record(TAG, "海洋任务🌊[" + taskTitle + "]已在黑名单中，跳过处理");
                             continue;
                         }
@@ -688,29 +681,30 @@ public class AntOcean extends ModelTask {
                                     .computeIfAbsent(bizKey, k -> new AtomicInteger(0))
                                     .incrementAndGet();
 
-                            JSONObject joFinishTask = new JSONObject(AntOceanRpcCall.finishTask(sceneCode, taskType));
+                         JSONObject joFinishTask = new JSONObject(AntOceanRpcCall.finishTask(sceneCode, taskType));
+                        // 获取错误码，用于自动加入黑名单
+                        String errorCode = joFinishTask.optString("code", "");
+                        String desc = joFinishTask.optString("desc", "");
+                        
+                        // 自动根据错误码加入黑名单
+                        TaskBlacklist.INSTANCE.autoAddToBlacklist(sceneCode, taskTitle, errorCode);
+                        
+                        // 检查特定错误码：不支持RPC完成的任务，直接跳过
+                        if ("400000040".equals(errorCode) || desc.contains("不支持RPC完成")) {
+                            continue;
+                        }
 
-                            // 检查特定错误码：不支持RPC完成的任务，直接加入黑名单
-                            String errorCode = joFinishTask.optString("code", "");
-                            String desc = joFinishTask.optString("desc", "");
-                            if ("400000040".equals(errorCode) || desc.contains("不支持RPC完成")) {
-                                Log.error(TAG, "海洋任务🌊[" + taskTitle + "]不支持RPC完成，已加入黑名单");
-                                badTaskSet.add(taskTitle);
-                                DataStore.INSTANCE.put("badOceanTaskSet", badTaskSet);
-                                continue;
-                            }
-
-                            if (count > 1) {
-                                badTaskSet.add(taskType);
-                                DataStore.INSTANCE.put("badOceanTaskSet", badTaskSet);
+                        if (count > 1) {
+                            // 多次失败的任务加入黑名单
+                            TaskBlacklist.INSTANCE.addToBlacklist(taskType, taskTitle);
+                        } else {
+                            if (ResChecker.checkRes(TAG, joFinishTask)) {
+                                Log.forest("海洋任务🌊完成[" + taskTitle + "]");
+                                done = true;
                             } else {
-                                if (ResChecker.checkRes(TAG, joFinishTask)) {
-                                    Log.forest("海洋任务🌊完成[" + taskTitle + "]");
-                                    done = true;
-                                } else {
-                                    Log.error(TAG, "海洋任务🌊完成失败：" + joFinishTask);
-                                }
+                                Log.error(TAG, "海洋任务🌊完成失败：" + joFinishTask);
                             }
+                        }
                         }
 
                         GlobalThreadPools.sleepCompat(500);

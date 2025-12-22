@@ -1,6 +1,8 @@
 package fansirsqi.xposed.sesame.task.antForest
 
 import android.annotation.SuppressLint
+import fansirsqi.xposed.sesame.data.Status
+import fansirsqi.xposed.sesame.hook.Toast
 import fansirsqi.xposed.sesame.util.Log
 import fansirsqi.xposed.sesame.util.ResChecker
 import kotlinx.coroutines.*
@@ -8,22 +10,15 @@ import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * 6秒拼手速打地鼠（随机间隔防限流版）
- *
- * 核心优化策略：
- * 1. 串行启动：避免并发请求触发服务器限流
- * 2. 随机间隔：启动间隔1000-2000ms随机，击打间隔50-60ms随机，模拟真人操作
- * 3. 智能等待：凑满6秒总时长，确保游戏逻辑完整
- * 4. 限流检测：检测到userBaseInfo=null时增加500ms退避时间
- * 5. 动态模式：支持击打模式（MAX_HITS_PER_GAME>0）和直接结算模式（=0）
- *
- * @author Ghostxx (优化版)
+ * 6秒拼手速打地鼠
+ * @author Ghostxx
  */
 object WhackMole {
     private const val TAG = "WhackMole"
     // ========== 核心配置 ==========
-    /** 一次性启动的游戏局数：5局 */
-    private const val TOTAL_GAMES = 5
+    /** 一次性启动的游戏局数：可配置 */
+    @Volatile
+    private var totalGames = 5
     /** 游戏总时长（毫秒）：严格等待10秒，让所有局完成 */
     private const val GAME_DURATION_MS = 10000L
     /** 全局协程作用域：用于管理所有协程，SupervisorJob确保子协程失败不影响其他 */
@@ -43,38 +38,60 @@ object WhackMole {
         val roundNumber: Int
     )
 
+    // ========== 配置方法 ==========
+    /**
+     * 设置游戏局数
+     * @param games 游戏局数
+     */
+    fun setTotalGames(games: Int) {
+        totalGames = games
+    }
+
+    // ========== 间隔计算器引用 ==========
+    /** 引用外部间隔计算器 */
+    private val intervalCalculator = GameIntervalCalculator
+
     // ========== 自动入口 ==========
     /**
      * 启动打地鼠游戏的主入口
-     * 1. 从配置读取击打次数
+     * 1. 从配置读取游戏局数
      * 2. 串行启动所有局（带随机间隔）
-     * 3. 等待凑满6秒
-     * 4. 按能量从高到低依次结算
+     * 3. 等待凑满10秒
+     * 4. 串行结算所有游戏局
      */
     @SuppressLint("DefaultLocale")
     fun startWhackMole() {
-        // 记录新规则到日志
-        Log.other(TAG, "打地鼠启动 ${TOTAL_GAMES}局 新规则：只启动存储token，10秒后串行结算")
-
         // 在IO协程中执行，避免阻塞主线程
         globalScope.launch {
             try {
                 // 记录启动时间戳
                 startTime.set(System.currentTimeMillis())
+                
+                // 计算动态间隔参数
+                val dynamicInterval = intervalCalculator.calculateDynamicInterval(GAME_DURATION_MS, totalGames)
+                Log.other(TAG, "🎮 动态间隔计算完成 - 基础间隔: ${dynamicInterval.baseInterval}ms, 随机范围: ±${dynamicInterval.randomRange}ms")
+                
                 // 串行启动每局游戏（避免并发限流）
                 val sessions = mutableListOf<GameSession>()
-                for (roundNum in 1..TOTAL_GAMES) {
-                    val session = startSingleRound(roundNum)
-                    if (session != null) {
-                        sessions.add(session)
+                try {
+                    for (roundNum in 1..totalGames) {
+                        val session = startSingleRound(roundNum)
+                        if (session != null) {
+                            sessions.add(session)
+                        }
+                        // 使用动态计算的间隔，避免并发请求触发服务器限流
+                        if (roundNum < totalGames) {
+                            val elapsedTime = System.currentTimeMillis() - startTime.get()
+                            val remainingTime = GAME_DURATION_MS - elapsedTime
+                            val delayMs = intervalCalculator.calculateNextDelay(dynamicInterval, roundNum, totalGames, remainingTime)
+                            Log.other(TAG, "🎮 第${roundNum}局后间隔: ${delayMs}ms (剩余时间: ${remainingTime}ms)")
+                            delay(delayMs)
+                        }
                     }
-                    // 随机间隔1000-2000ms，避免并发请求触发服务器限流
-                    if (roundNum < TOTAL_GAMES) {
-                        val delayMs = (1000..2000).random()
-                        delay(delayMs.toLong())
-                    }
+                } catch (e: CancellationException) {
+                    Log.debug(TAG, "游戏启动被打断: ${e.message}")
+                    return@launch
                 }
-
 
                 // 计算剩余等待时间，凑满10秒
                 val elapsedTime = System.currentTimeMillis() - startTime.get()
@@ -91,10 +108,8 @@ object WhackMole {
                 sessions.forEach { session ->
                     totalEnergy += settleBestRound(session)
                 }
-
                 // 最终日志：显示成功局数和总能量
-                Log.forest("森林能量⚡️[打地鼠${sessions.size}局串行结算 总计${totalEnergy}g]")
-
+                Log.forest("森林能量⚡️[打地鼠${sessions.size}局结算 总计${totalEnergy}g]")
             } catch (_: CancellationException) {
                 Log.other(TAG, "打地鼠协程被取消")
             } catch (e: Exception) {
@@ -117,23 +132,24 @@ object WhackMole {
             if (!ResChecker.checkRes("$TAG 启动失败:", startResp)) {
                 return@withContext null
             }
-            // 限流检测：userBaseInfo为null说明服务器限制新开游戏
-            val userBaseInfo = startResp.optJSONObject("userBaseInfo")
-            if (userBaseInfo == null) {
-                Log.other(TAG, "服务器限流：userBaseInfo=null，第${round}局失败")
-                delay(500L) // 退避500ms后重试
-                return@withContext null
+            // 检查今日是否还能玩游戏
+            val canPlayToday = startResp.optBoolean("canPlayToday", true)
+            if (!canPlayToday) {
+                Log.other(TAG, "今日打地鼠次数已用完，canPlayToday=false")
+                // 设置今日已执行标志，避免重复尝试
+                Status.setFlagToday("forest::whackMole::executed")
+                throw CancellationException("今日打地鼠次数已用完")
             }
+
             val token = startResp.optString("token")
             Log.other(TAG, "第${round}局启动成功，token=$token")
-            // 新规则：直接返回token，不进行击打
+            Toast.show("打地鼠 第${round}局启动成功:"+"token=$token"+"\n请速回蚂蚁森林滑块验证，10秒后结算")
             GameSession(token, round)
         } catch (e: CancellationException) {
-            // 协程取消异常需要重新抛出，父协程会处理
             throw e
         } catch (e: Exception) {
             Log.other(TAG, "第${round}局异常: ${e.message}")
-            null
+            return@withContext null
         }
     }
 

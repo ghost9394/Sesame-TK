@@ -68,8 +68,6 @@ object TaskBlacklist {
         val currentBlacklist = getBlacklist().toMutableSet()
         if (currentBlacklist.add(blacklistItem)) {
             saveBlacklist(currentBlacklist)
-            val displayInfo = if (taskTitle.isNotBlank()) "$taskId - $taskTitle" else taskId
-            Log.record(TAG, "任务[$displayInfo]已加入黑名单")
         }
     }
     

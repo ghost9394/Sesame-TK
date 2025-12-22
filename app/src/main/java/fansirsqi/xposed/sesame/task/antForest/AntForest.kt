@@ -31,7 +31,7 @@ import fansirsqi.xposed.sesame.model.modelFieldExt.StringModelField
 import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.task.ModelTask
 import fansirsqi.xposed.sesame.task.TaskCommon
-import fansirsqi.xposed.sesame.task.TaskStatus
+import fansirsqi.xposed.sesame.task.antFarm.TaskStatus
 import fansirsqi.xposed.sesame.task.antForest.ForestUtil.hasBombCard
 import fansirsqi.xposed.sesame.task.antForest.ForestUtil.hasShield
 import fansirsqi.xposed.sesame.task.antForest.Privilege.studentSignInRedEnvelope
@@ -197,6 +197,9 @@ class AntForest : ModelTask(), EnergyCollectCallback {
     private var cycleinterval: IntegerModelField? = null
     private var energyRainChance: BooleanModelField? = null
     private var energyRainTime: StringModelField? = null // 能量雨执行时间
+    /** 6秒拼手速游戏局数配置 */
+    var whackMoleGames: IntegerModelField? = null
+    var whackMoleTime: StringModelField? = null // 6秒拼手速执行时间
 
     /**
      * 能量炸弹卡
@@ -309,6 +312,20 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                 "🎮 6秒拼手速 | 开关",
                 false
             ).also { closeWhackMole = it })
+            modelFields.addField(
+            IntegerModelField(
+                "whackMoleGames",
+                "🎮 6秒拼手速 | 游戏局数",
+                5,
+            ).also { whackMoleGames = it })
+        modelFields.addField(
+            StringModelField(
+                "whackMoleTime",
+                "🎮 6秒拼手速 | 默认8点20后执行",
+                "0820"
+            ).also({ whackMoleTime = it })
+        )
+
         modelFields.addField(
             BooleanModelField(
                 "energyRain",
@@ -1391,16 +1408,23 @@ class AntForest : ModelTask(), EnergyCollectCallback {
         try {
             // 只有开启开关时才执行
             if (closeWhackMole!!.value) {
-                val whackMoleFlag = "forest::whackMole::executed"
-                // 检查今天是否已执行过打地鼠
-                if (Status.hasFlagToday(whackMoleFlag)) {
-                    Log.record(TAG, "⏭️ 今天已完成过6秒拼手速，跳过执行")
+                // 检查是否到达执行时间
+                if (TaskTimeChecker.isTimeReached(whackMoleTime?.value, "0820")) {
+                    val whackMoleFlag = "forest::whackMole::executed"
+                    // 检查今天是否已执行过打地鼠
+                    if (Status.hasFlagToday(whackMoleFlag)) {
+                        Log.record(TAG, "⏭️ 今天已完成过6秒拼手速，跳过执行")
+                    } else {
+                        // 主动执行打地鼠（今日首次）
+                        Log.record(TAG, "🎮 开始执行6秒拼手速（今日首次）")
+                        // 设置游戏局数配置
+                        val configGames = whackMoleGames?.value ?: 5
+                        WhackMole.setTotalGames(configGames)
+                        WhackMole.startWhackMole()
+                        Log.record(TAG, "✅ 6秒拼手速已完成，今天不再执行")
+                    }
                 } else {
-                    // 主动执行打地鼠（今日首次）
-                    Log.record(TAG, "🎮 开始执行6秒拼手速（今日首次）")
-                    WhackMole.startWhackMole()
-                    Status.setFlagToday(whackMoleFlag)
-                    Log.record(TAG, "✅ 6秒拼手速已完成，今天不再执行")
+                    Log.record(TAG, "🎮 6秒拼手速未到执行时间，跳过")
                 }
             }
         } catch (t: Throwable) {
@@ -4461,12 +4485,13 @@ private fun useShieldCard(bagObject: JSONObject?) {
 
         private val offsetTimeMath = Average(5)
 
+
         // 保持向后兼容
         /** 保护罩续写阈值（HHmm），例如 2359 表示 23小时59分  */
         private const val SHIELD_RENEW_THRESHOLD_HHMM = 2359
         var giveEnergyRainList: SelectModelField? = null //能量雨赠送列表
         var medicalHealthOption: SelectModelField? = null //医疗健康选项
-         var ecoLifeOption: SelectModelField? = null
+        var ecoLifeOption: SelectModelField? = null
 
         /**
          * 异常返回检测开关
