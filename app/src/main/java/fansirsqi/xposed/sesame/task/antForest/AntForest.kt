@@ -29,6 +29,7 @@ import fansirsqi.xposed.sesame.model.modelFieldExt.SelectAndCountModelField
 import fansirsqi.xposed.sesame.model.modelFieldExt.SelectModelField
 import fansirsqi.xposed.sesame.model.modelFieldExt.StringModelField
 import fansirsqi.xposed.sesame.newutil.DataStore
+import fansirsqi.xposed.sesame.newutil.TaskBlacklist
 import fansirsqi.xposed.sesame.task.ModelTask
 import fansirsqi.xposed.sesame.task.TaskCommon
 import fansirsqi.xposed.sesame.task.antFarm.TaskStatus
@@ -2829,28 +2830,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
      */
     private fun receiveTaskAward() {
         try {
-            // 修复：使用new HashSet包装从缓存获取的数据，兼容List/Set类型
-            val presetBad: MutableSet<String?> = LinkedHashSet(
-                mutableListOf<String?>(
-                    "ENERGYRAIN",  //能量雨
-                    "ENERGY_XUANJIAO",  //践行绿色行为
-                    "FOREST_TOTAL_COLLECT_ENERGY_3",  //累积3天收自己能量
-                    "TEST_LEAF_TASK",  //逛农场得落叶肥料
-                    "SHARETASK" //邀请好友助力
-                )
-            )
-
-            /* 3️⃣ 失败任务集合：空文件时自动创建空 HashSet 并立即落盘 */
-            val typeRef: TypeReference<MutableSet<String?>> =
-                object : TypeReference<MutableSet<String?>>() {}
-            val badTaskSet: MutableSet<String?> =
-                DataStore.getOrCreate("badForestTaskSet", typeRef)
-            /* 3️⃣ 首次运行时把预设黑名单合并进去并立即落盘 */
-            if (badTaskSet.isEmpty()) {
-                badTaskSet.addAll(presetBad)
-                DataStore.put("badForestTaskSet", badTaskSet) // 持久化
-            }
-
+            // 使用统一的任务黑名单管理器，包含默认黑名单和用户自定义黑名单
             while (true) {
                 var doubleCheck = false // 标记是否需要再次检查任务
                 val s = AntForestRpcCall.queryTaskList() // 查询任务列表
@@ -2861,7 +2841,6 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                     //Log.runtime(s) // 打印响应内容
                     break
                 }
-
                 // 提取森林任务列表
                 val forestSignVOList = jo.getJSONArray("forestSignVOList")
                 var sumawardCount = 0
@@ -2881,7 +2860,6 @@ class AntForest : ModelTask(), EnergyCollectCallback {
 
                     for (j in 0..<taskInfoList.length()) {
                         val taskInfo = taskInfoList.getJSONObject(j)
-
                         val taskBaseInfo = taskInfo.getJSONObject("taskBaseInfo") // 获取任务基本信息
                         val taskType = taskBaseInfo.getString("taskType") // 获取任务类型
                         val sceneCode = taskBaseInfo.getString("sceneCode") // 获取场景代码
@@ -2912,37 +2890,33 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                             }
                             GlobalThreadPools.sleepCompat(500)
                         } else if (TaskStatus.TODO.name == taskStatus) {
-                            // 跳过已失败的任务
-                            if (badTaskSet.contains(taskType)) continue
-
-                            if (!badTaskSet.contains(taskType)) {
-                                val bizKey = sceneCode + "_" + taskType
-                                val count = forestTaskTryCount
-                                    .computeIfAbsent(bizKey) { _: String? ->
-                                        AtomicInteger(
-                                            0
-                                        )
-                                    }
-                                    .incrementAndGet()
-
-                                // 完成任务请求
-                                val joFinishTask = JSONObject(
-                                    AntForestRpcCall.finishTask(
-                                        sceneCode,
-                                        taskType
-                                    )
-                                ) // 完成任务请求
-                                if (count > 1) {
-                                    Log.error(
-                                        TAG,
-                                        "完成森林任务失败超过1次$taskTitle\n$joFinishTask"
-                                    ) // 记录完成任务失败信息
-                                    badTaskSet.add(taskType)
-                                    DataStore.put("badForestTaskSet", badTaskSet)
-                                } else {
-                                    Log.forest("森林任务🧾️[$taskTitle]")
-                                    doubleCheck = true // 标记需要重新检查任务
+                            // 跳过已在黑名单中的任务
+                            if (TaskBlacklist.isTaskInBlacklist(taskType)) continue
+                            // 执行待完成任务
+                            val bizKey = sceneCode + "_" + taskType
+                            val count = forestTaskTryCount
+                                .computeIfAbsent(bizKey) { _: String? ->
+                                    AtomicInteger(0)
                                 }
+                                .incrementAndGet()
+                            // 完成任务请求
+                            val joFinishTask = JSONObject(
+                                AntForestRpcCall.finishTask(sceneCode, taskType)
+                            )
+                            
+                            // 检查任务执行结果
+                            if (!ResChecker.checkRes(TAG + "完成森林任务失败:", joFinishTask)) {
+                                // 获取错误码并尝试自动加入黑名单
+                                val errorCode = joFinishTask.optString("code", "")
+                                val errorDesc = joFinishTask.optString("desc", "未知错误")
+                                TaskBlacklist.autoAddToBlacklist(taskType, taskTitle, errorCode)
+                                // 如果重试次数超过1次，手动加入黑名单
+                                if (count > 1) {
+                                    TaskBlacklist.addToBlacklist(taskType, taskTitle)
+                                }
+                            } else {
+                                Log.forest("森林任务🧾️[$taskTitle]")
+                                doubleCheck = true // 标记需要重新检查任务
                             }
                         }
 
@@ -2951,7 +2925,6 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                             // 游戏任务跳转
                             val gameUrl = bizInfo.getString("taskJumpUrl")
                             Log.runtime(TAG, "跳转到游戏: $gameUrl")
-
                             // 模拟跳转游戏任务URL（根据需要可能需要在客户端实际触发）
                             Log.runtime(TAG, "等待30S")
                             GlobalThreadPools.sleepCompat(30000) // 等待任务完成
@@ -2962,17 +2935,18 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                                     taskType
                                 )
                             ) // 完成任务请求
+
+                            val error = joFinishTask.optString("code", "")
                             if (ResChecker.checkRes(TAG + "完成游戏任务失败:", joFinishTask)) {
                                 Log.forest("游戏任务完成 🎮️[" + taskTitle + "]# " + awardCount + "活力值")
                                 sumawardCount += awardCount
                                 doubleCheck = true // 标记需要重新检查任务
                             } else {
-                                Log.error(TAG, "游戏任务完成失败: $taskTitle") // 记录任务完成失败信息
+                                TaskBlacklist.autoAddToBlacklist(taskType, taskTitle, error)
                             }
                         }
                     }
                 }
-
                 if (!doubleCheck) break
             }
         } catch (t: Throwable) {
@@ -3829,7 +3803,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                 "道具 $propName (类型: $propType), 是否可续用: $isRenewable, 当前持有数量: $holdsNum"
             )
             val propGroup = AntForestRpcCall.getPropGroup(propType)
-            if (isRenewable && holdsNum > 1) {
+            if (isRenewable) {
                 // 第一步：发送检查/尝试使用请求 (secondConfirm=false)
                 val checkResponseStr = AntForestRpcCall.consumeProp(propGroup, propId, propType, false)
                 val checkResponse = JSONObject(checkResponseStr)

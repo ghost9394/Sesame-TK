@@ -83,5 +83,15 @@ val defaultBlacklist = setOf(
     "SHANGOU_xiadan",  //逛闪购外卖1元起吃
     "OFFLINE_PAY",  //到店付款,线下支付
     "ONLINE_PAY",  //在线支付
-    "HUABEI_MAP_180" //用花呗完成一笔支付
+    "HUABEI_MAP_180", //用花呗完成一笔支付
+
+    // 森林任务 - 不支持RPC调用的任务
+    "ZHRW_AQapp_202512",    // 去蚂蚁阿福健康问答
+    "LSHS_huisho20_202508",  // 完成旧衣回收得能量
+    "TEST_LEAF_TASK",        // 逛农场得落叶肥料
+    "SHARETASK_NEW",         // 邀请1位好友助力
+    "YUSHU_202511",          // 单种榆树，年年有榆
+    "KTKZ_YS202511",         // 一起组团种榆树
+    "mokuai_senlin_hlz",     // 去玩一玩得活力值
+
 )

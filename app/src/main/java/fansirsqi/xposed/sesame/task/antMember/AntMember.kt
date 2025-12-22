@@ -80,6 +80,10 @@ class AntMember : ModelTask() {
     // 黄金票配置 - 提取/兑换
     private var enableGoldTicketConsume: BooleanModelField? = null
 
+
+    /** @brief 信用2101功能开关 */
+    private var credit2101: BooleanModelField? = null
+
     override fun getFields(): ModelFields {
         val modelFields = ModelFields()
         modelFields.addField(BooleanModelField("memberSign", "会员签到", false).also { memberSign = it })
@@ -144,6 +148,9 @@ class AntMember : ModelTask() {
             ).also { beanExchangeBubbleBoost = it })
         modelFields.addField(BooleanModelField("annualReview", "年度回顾", false).also { annualReview = it })
 
+
+        credit2101 = BooleanModelField("credit2101", "信用2101", false)
+        modelFields.addField(credit2101)
         return modelFields
     }
 
@@ -164,22 +171,22 @@ class AntMember : ModelTask() {
         runBlocking {
             try {
                 Log.record(TAG, "执行开始-$name")
-                
+
                 // 并行执行独立任务
                 val deferredTasks = mutableListOf<Deferred<Unit>>()
-                
+
                 if (memberSign!!.value) {
                     deferredTasks.add(async(Dispatchers.IO) { doMemberSign() })
                 }
-                
+
                 if (memberTask!!.value) {
                     deferredTasks.add(async(Dispatchers.IO) { doAllMemberAvailableTask() })
                 }
-                
+
                 if (memberPointExchangeBenefit!!.value) {
                     deferredTasks.add(async(Dispatchers.IO) { memberPointExchangeBenefit() })
                 }
-                
+
                 // 芝麻信用相关检测
                 val isSesameOpened: Boolean = checkSesameCanRun()
 
@@ -200,36 +207,36 @@ class AntMember : ModelTask() {
                         deferredTasks.add(async(Dispatchers.IO) { collectSesame(collectSesameWithOneClick!!.value) })
                     }
                 }
-                
+
                 if (collectInsuredGold!!.value) {
                     deferredTasks.add(async(Dispatchers.IO) { collectInsuredGold() })
                 }
-                
+
                 // 【更新】执行黄金票任务，替换旧的 goldTicket()
                 if (enableGoldTicket!!.value || enableGoldTicketConsume!!.value) {
                     // 传入签到和提取的开关值
                     deferredTasks.add(async(Dispatchers.IO) { doGoldTicketTask(enableGoldTicket!!.value, enableGoldTicketConsume!!.value) })
                 }
-                
+
                 if (enableGameCenter!!.value) {
                     deferredTasks.add(async(Dispatchers.IO) { enableGameCenter() })
                 }
-                
+
                 if (beanSignIn!!.value) {
                     deferredTasks.add(async(Dispatchers.IO) { beanSignIn() })
                 }
-                
+
                 if (annualReview!!.value) {
                     deferredTasks.add(async(Dispatchers.IO) { doAnnualReview() })
                 }
-                
+
                 if (beanExchangeBubbleBoost!!.value) {
                     deferredTasks.add(async(Dispatchers.IO) { beanExchangeBubbleBoost() })
                 }
-                
+
                 // 芝麻炼金
                 if (sesameAlchemy!!.value && isSesameOpened) {
-                    deferredTasks.add(async(Dispatchers.IO) { 
+                    deferredTasks.add(async(Dispatchers.IO) {
                         doSesameAlchemy()
                         // ===== 次日奖励：只有今天还没领过才执行 =====
                         if (!hasFlagToday(StatusFlags.FLAG_ZMXY_ALCHEMY_NEXT_DAY_AWARD)) {
@@ -237,7 +244,7 @@ class AntMember : ModelTask() {
                         } else Log.record(TAG, "✅ 芝麻粒次日奖励已领取，今天不再执行")
                     })
                 }
-                
+
                 // 芝麻树
                 if (enableZhimaTree!!.value && isSesameOpened) {
                     deferredTasks.add(async(Dispatchers.IO) { doZhimaTree() })
@@ -268,10 +275,17 @@ class AntMember : ModelTask() {
                         }
                     })
                 }
-                
+
+
+                if (credit2101!!.value) {
+                    Log.record(TAG, "执行开始 信用2101")
+                    Credit2101.doCredit2101()
+                    Log.record(TAG, "执行结束 信用2101")
+                }
+
                 // 等待所有异步任务完成
                 deferredTasks.awaitAll()
-                
+
             } catch (t: Throwable) {
                 Log.printStackTrace(TAG, t)
             } finally {
@@ -2015,8 +2029,8 @@ class AntMember : ModelTask() {
                     Log.other("芝麻炼金⚗️[任务完成: " + title + "]#获得" + reward + "粒")
                 } else {
                     val errorCode = finishJo.optString("resultCode", "")
-                   //  val errorMsg = finishJo.optString("resultView", finishRes)
-                   //  Log.error(TAG, "任务提交失败: $title - $errorMsg")
+                    //  val errorMsg = finishJo.optString("resultView", finishRes)
+                    //  Log.error(TAG, "任务提交失败: $title - $errorMsg")
                     // 自动添加到黑名单
                     if (!errorCode.isEmpty()) {
                         autoAddToBlacklist(title, title, errorCode)

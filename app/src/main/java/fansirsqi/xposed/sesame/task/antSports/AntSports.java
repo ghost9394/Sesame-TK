@@ -69,7 +69,6 @@ public class AntSports extends ModelTask {
     // 记录训练好友获得0金币的次数
     private int zeroTrainCoinCount = 0;
 
-
     //健康岛任务
     private BooleanModelField neverlandTask;  //健康岛任务
     private BooleanModelField neverlandGrid;    //健康岛走路
@@ -90,7 +89,6 @@ public class AntSports extends ModelTask {
     public String getIcon() {
         return "AntSports.png";
     }
-
 
     @Override
     public ModelFields getFields() {
@@ -208,7 +206,7 @@ public class AntSports extends ModelTask {
             if (!Status.hasFlagToday("sport::dailyTasks") && sportsTasks.getValue()) {
                 // 先执行原有运动任务面板逻辑
                 sportsTasks();
-                Status.setFlagToday("sport::dailyTasks");
+
             }
 
             // 运动球任务
@@ -336,6 +334,7 @@ public class AntSports extends ModelTask {
                 if (totalTasks > 0 && completedTasks >= totalTasks && availableTasks == 0) {
                     String today = TimeUtil.getDateStr2();
                     DataStore.INSTANCE.put(SPORTS_TASKS_COMPLETED_DATE, today);
+                    Status.setFlagToday("sport::dailyTasks");
                     Log.record(TAG, "✅ 所有运动任务已完成，今日不再执行");
                 }
             }
@@ -354,7 +353,7 @@ public class AntSports extends ModelTask {
 
             if (ResChecker.checkRes(TAG,result)) {
                 //String changeAmount = resultData.optString("changeAmount", "0");
-                Log.other(TAG, "做任务得能量🎈[领取成功：" + taskName + "，获得：" + prizeAmount + "能量]");
+                Log.other(TAG, "做任务得能量🎈["+taskName+"] +"+prizeAmount + "能量");
                 return true;
             } else {
                 String errorMsg = resultData.optString("errorMsg", "未知错误");
@@ -394,14 +393,14 @@ public class AntSports extends ModelTask {
                 GlobalThreadPools.sleepCompat(2000);
             }
 
-            Log.record(TAG, "做任务得能量🎈[开始执行：" + taskName + "，需完成" + remainingNum + "次]");
+            //Log.record(TAG, "做任务得能量🎈[开始执行：" + taskName + "，需完成" + remainingNum + "次]");
 
             // 执行任务
             for (int i = 0; i < remainingNum; i++) {
                 JSONObject result = new JSONObject(AntSportsRpcCall.completeExerciseTasks(taskId));
 
                 if (ResChecker.checkRes(TAG,result)) {
-                    Log.other(TAG, "做任务得能量🎈[完成任务：" + taskName + "，得" + prizeAmount + "💰]#(" + (i + 1) + "/" + remainingNum + ")");
+                    Log.record(TAG, "做任务得能量🎈[完成任务：" + taskName + "，得" + prizeAmount + "💰]#(" + (i + 1) + "/" + remainingNum + ")");
 
                     // 完成任务后尝试领取奖励
                     if (i == remainingNum - 1) {
@@ -538,23 +537,56 @@ public class AntSports extends ModelTask {
 
     private void sportsCheck_in() {
         try {
-            JSONObject jo = new JSONObject(AntSportsRpcCall.sportsCheck_in());
-            if (ResChecker.checkRes(TAG,jo)) {
-                JSONObject data = jo.getJSONObject("data");
-                if (!data.getBoolean("signed")) {
-                    JSONObject subscribeConfig;
-                    if (data.has("subscribeConfig")) {
-                        subscribeConfig = data.getJSONObject("subscribeConfig");
-                        Log.record(TAG, "做任务得能量🎈能量🎈[完成任务：签到" + subscribeConfig.getString("subscribeExpireDays") + "天，" + data.getString("toast") + "💰]");
+            // 第一步：先执行查询操作，获取签到状态
+            JSONObject queryJo = new JSONObject(AntSportsRpcCall.signInCoinTask("query"));
+            if (ResChecker.checkRes(TAG, queryJo)) {
+                JSONObject data = queryJo.getJSONObject("data");
+                boolean isSigned = data.getBoolean("signed");
+
+                // 如果整体未签到，遍历签到配置列表查找今日签到项
+                if (!isSigned) {
+                    JSONArray signConfigList = data.getJSONArray("signConfigList");
+                    // 遍历所有签到配置项
+                    for (int i = 0; i < signConfigList.length(); i++) {
+                        JSONObject configItem = signConfigList.getJSONObject(i);
+                        boolean toDay = configItem.getBoolean("toDay");
+                        boolean itemSigned = configItem.getBoolean("signed");
+
+                        // 找到今日未签到的项
+                        if (toDay && !itemSigned) {
+                            int coinAmount = configItem.getInt("coinAmount");
+                            // 执行签到操作
+                            JSONObject signJo = new JSONObject(AntSportsRpcCall.signInCoinTask("signIn"));
+
+                            if (ResChecker.checkRes(TAG, signJo)) {
+                                JSONObject signData = signJo.getJSONObject("data");
+                                JSONObject subscribeConfig = signData.has("subscribeConfig")
+                                        ? signData.getJSONObject("subscribeConfig")
+                                        : new JSONObject();
+
+                                String expireDays = subscribeConfig.has("subscribeExpireDays")
+                                        ? subscribeConfig.getString("subscribeExpireDays")
+                                        : "未知";
+                                String toast = signData.has("toast") ? signData.getString("toast") : "";
+
+                                // 输出签到成功信息，包含获得的能量数
+                                Log.other(TAG, "做任务得能量🎈[签到" + expireDays + "天|"
+                                        + coinAmount + "能量，" + toast + "💰]");
+                            } else {
+                                Log.record(TAG, "签到接口调用失败：" + signJo.toString());
+                            }
+                            // 找到今日项后退出循环，避免重复处理
+                            break;
+                        }
                     }
                 } else {
                     Log.record(TAG, "运动签到今日已签到");
                 }
             } else {
-                Log.record(jo.toString());
+                Log.record(TAG, "查询签到状态失败：" + queryJo.toString());
             }
         } catch (Exception e) {
-            Log.printStackTrace(TAG,"sportsCheck_in err",e);
+            Log.printStackTrace(TAG, "sportsCheck_in err", e);
         }
     }
 
@@ -663,7 +695,7 @@ public class AntSports extends ModelTask {
         try {
             Date date = new Date();
             @SuppressLint("SimpleDateFormat") SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-            JSONObject jo = new JSONObject(AntSportsRpcCall.queryPath("202312191135", sdf.format(date), pathId));
+            JSONObject jo = new JSONObject(AntSportsRpcCall.queryPath(sdf.format(date), pathId));
             if (ResChecker.checkRes(TAG, jo)) {
                 path = jo.getJSONObject("data");
                 JSONArray ja = jo.getJSONObject("data").getJSONArray("treasureBoxList");
@@ -2773,7 +2805,6 @@ private boolean handleLightTask(JSONObject task, String title, String jumpLink) 
         // -------------------------------------------------------------------------
         // 工具函数（bizId提取逻辑无变更）
         // -------------------------------------------------------------------------
-
         private String extractBizIdFromJumpLink(String jumpLink) {
             if (jumpLink == null || jumpLink.isEmpty()) return null;
 
