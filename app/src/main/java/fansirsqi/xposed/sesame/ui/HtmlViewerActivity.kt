@@ -269,9 +269,7 @@ class HtmlViewerActivity : BaseActivity() {
 
     override fun onDestroy() {
         // 先移除监听
-        if (binding.mwvWebview is MyWebView) {
-            (binding.mwvWebview as MyWebView).stopWatchingIncremental()
-        }
+        binding.mwvWebview.stopWatchingIncremental()
         // 清理 WebView
         binding.mwvWebview.apply {
             loadUrl("about:blank")

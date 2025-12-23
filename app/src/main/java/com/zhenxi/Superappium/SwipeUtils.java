@@ -31,10 +31,6 @@ public class SwipeUtils {
     /**
      * 默认对当前屏幕进行滑动
      *
-     * @param startX
-     * @param startY
-     * @param endX
-     * @param endY
      */
     public static void simulateScroll(int startX, int startY, int endX, int endY) {
         Activity topActivity = PageManager.getTopActivity();

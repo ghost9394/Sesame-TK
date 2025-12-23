@@ -492,8 +492,16 @@ public class ApplicationHook {
             Log.printStackTrace(TAG, "验证码Hook初始化失败", t);
         }
 
-        PageManager.addHandler("com.alipay.mobile.nebulax.xriver.activity.XRiverActivity",
-                new CaptchaHandler());
+        // 初始化CaptchaHandler
+            PageManager.addHandler("com.alipay.mobile.nebulax.xriver.activity.XRiverActivity",
+                    new Captcha1Handler());
+
+            PageManager.addHandler("com.eg.android.AlipayGphone.AlipayLogin",
+                new Captcha2Handler());
+
+
+
+
         try {
             // 在Hook Application.attach 之前，先 deoptimize LoadedApk.makeApplicationInner
             try {

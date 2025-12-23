@@ -737,7 +737,7 @@ public class AntOcean extends ModelTask {
                 // GlobalThreadPools.sleepCompat(500);
                 JSONObject submitJson = new JSONObject(submitResponse);
                 if (submitJson.getInt("resultCode") == 200) {
-                    Log.forest(TAG, "🌊海洋答题成功");
+                    Log.forest( "🌊海洋答题成功");
                 } else {
                     Log.error(TAG, "海洋答题失败：" + submitJson);
                 }

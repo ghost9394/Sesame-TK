@@ -69,7 +69,7 @@ object WhackMole {
                 
                 // 计算动态间隔参数
                 val dynamicInterval = intervalCalculator.calculateDynamicInterval(GAME_DURATION_MS, totalGames)
-                Log.other(TAG, "🎮 动态间隔计算完成 - 基础间隔: ${dynamicInterval.baseInterval}ms, 随机范围: ±${dynamicInterval.randomRange}ms")
+                Log.other( "🎮 动态间隔计算完成 - 基础间隔: ${dynamicInterval.baseInterval}ms, 随机范围: ±${dynamicInterval.randomRange}ms")
                 
                 // 串行启动每局游戏（避免并发限流）
                 val sessions = mutableListOf<GameSession>()
@@ -84,7 +84,7 @@ object WhackMole {
                             val elapsedTime = System.currentTimeMillis() - startTime.get()
                             val remainingTime = GAME_DURATION_MS - elapsedTime
                             val delayMs = intervalCalculator.calculateNextDelay(dynamicInterval, roundNum, totalGames, remainingTime)
-                            Log.other(TAG, "🎮 第${roundNum}局后间隔: ${delayMs}ms (剩余时间: ${remainingTime}ms)")
+                            Log.other( "🎮 第${roundNum}局后间隔: ${delayMs}ms (剩余时间: ${remainingTime}ms)")
                             delay(delayMs)
                         }
                     }
@@ -97,10 +97,10 @@ object WhackMole {
                 val elapsedTime = System.currentTimeMillis() - startTime.get()
                 val remainingTime = GAME_DURATION_MS - elapsedTime
                 if (remainingTime > 0) {
-                    Log.other(TAG, "已启动${sessions.size}局，等待${remainingTime}ms凑满10秒...")
+                    Log.other( "已启动${sessions.size}局，等待${remainingTime}ms凑满10秒...")
                     delay(remainingTime)
                 } else {
-                    Log.other(TAG, "已启动${sessions.size}局，已超过10秒，立即结算")
+                    Log.other( "已启动${sessions.size}局，已超过10秒，立即结算")
                 }
 
                 // 串行结算所有游戏局
@@ -111,9 +111,9 @@ object WhackMole {
                 // 最终日志：显示成功局数和总能量
                 Log.forest("森林能量⚡️[打地鼠${sessions.size}局结算 总计${totalEnergy}g]")
             } catch (_: CancellationException) {
-                Log.other(TAG, "打地鼠协程被取消")
+                Log.other( "打地鼠协程被取消")
             } catch (e: Exception) {
-                Log.other(TAG, "打地鼠异常: ${e.message}")
+                Log.other( "打地鼠异常: ${e.message}")
             }
         }
     }
@@ -135,20 +135,20 @@ object WhackMole {
             // 检查今日是否还能玩游戏
             val canPlayToday = startResp.optBoolean("canPlayToday", true)
             if (!canPlayToday) {
-                Log.other(TAG, "今日打地鼠次数已用完，canPlayToday=false")
+                Log.other( "今日打地鼠次数已用完，canPlayToday=false")
                 // 设置今日已执行标志，避免重复尝试
                 Status.setFlagToday("forest::whackMole::executed")
                 throw CancellationException("今日打地鼠次数已用完")
             }
 
             val token = startResp.optString("token")
-            Log.other(TAG, "第${round}局启动成功，token=$token")
+            Log.other( "第${round}局启动成功，token=$token")
             Toast.show("打地鼠 第${round}局启动成功:"+"token=$token"+"\n请速回蚂蚁森林滑块验证，10秒后结算")
             GameSession(token, round)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.other(TAG, "第${round}局异常: ${e.message}")
+            Log.other( "第${round}局异常: ${e.message}")
             return@withContext null
         }
     }
@@ -178,7 +178,7 @@ object WhackMole {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.other(TAG, "结算异常: ${e.message}")
+            Log.other( "结算异常: ${e.message}")
         }
         return@withContext 0
     }

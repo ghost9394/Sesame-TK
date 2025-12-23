@@ -363,7 +363,7 @@ class AntMember : ModelTask() {
                     try {
                         val openJo = JSONObject(openResp)
                         if (ResChecker.checkRes(TAG, openJo)) {
-                            Log.other(TAG, "信誉任务[领取成功] $title")
+                            Log.other( "信誉任务[领取成功] $title")
                         } else {
                             Log.record(
                                 "$TAG.handleGrowthGuideTasks", ("信誉任务[领取失败] behaviorId="
@@ -380,7 +380,7 @@ class AntMember : ModelTask() {
                 if ("meiriwenda" == behaviorId && "wait_doing" == status) { //如果等待去做才执行，一般不会进入下面的今日已参与判断
 
                     if (subTitle.contains("今日已参与")) {
-                        Log.other(TAG, "信誉任务[每日问答] $subTitle（跳过答题）")
+                        Log.other( "信誉任务[每日问答] $subTitle（跳过答题）")
                         continue
                     }
 
@@ -479,7 +479,7 @@ class AntMember : ModelTask() {
                     }
 
                     if (ResChecker.checkRes(TAG, jo)) {
-                        Log.other(TAG, "信誉任务[视频问答提交成功] → ")
+                        Log.other( "信誉任务[视频问答提交成功] → ")
                     } else {
                         Log.error("$TAG.handleGrowthGuideTasks", "视频问答[提交失败] → $pushResp")
                     }
@@ -2562,7 +2562,7 @@ class AntMember : ModelTask() {
                         val activityNo = jo.getString("activityNo")
                         val joSignIn = JSONObject(AntMemberRpcCall.signIn(activityNo))
                         if (ResChecker.checkRes(TAG, joSignIn)) {
-                            Log.other(TAG, "商家服务🏬[开门打卡签到成功]")
+                            Log.other( "商家服务🏬[开门打卡签到成功]")
                         } else {
                             Log.record(TAG, joSignIn.getString("errorMsg"))
                             Log.runtime(TAG, joSignIn.toString())
@@ -2597,7 +2597,7 @@ class AntMember : ModelTask() {
                             val activityPeriodName = jo.getString("activityPeriodName")
                             val joSignUp = JSONObject(AntMemberRpcCall.signUp(activityNo))
                             if (ResChecker.checkRes(TAG, joSignUp)) {
-                                Log.other(TAG, "商家服务🏬[" + activityPeriodName + "开门打卡报名]")
+                                Log.other( "商家服务🏬[" + activityPeriodName + "开门打卡报名]")
                                 return@run
                             } else {
                                 Log.record(TAG, joSignUp.getString("errorMsg"))
@@ -2630,7 +2630,7 @@ class AntMember : ModelTask() {
                 val signResult = jo.getString("signInResult")
                 val reward = jo.getString("todayReward")
                 if ("SUCCESS" == signResult) {
-                    Log.other(TAG, "商家服务🏬[每日签到]#获得积分$reward")
+                    Log.other( "商家服务🏬[每日签到]#获得积分$reward")
                 } else {
                     Log.record(TAG, s)
                     Log.runtime(TAG, s)

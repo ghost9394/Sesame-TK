@@ -180,7 +180,7 @@ class AntCooperate : ModelTask() {
 
                             val remainingQuota = configTotalLimit - totalWatered
                             if (remainingQuota <= 0) {
-                                Log.forest(TAG, "$name 累计浇水已达标($totalWatered/$configTotalLimit)，跳过")
+                                Log.forest( "$name 累计浇水已达标($totalWatered/$configTotalLimit)，跳过")
                                 continue
                             }
 
@@ -246,7 +246,7 @@ class AntCooperate : ModelTask() {
                 myWatered = todayWaterMap?.optInt(currentUid, 0)
                 if (myWatered != null) {
                     if (myWatered > 0) {
-                        Log.forest(TAG, "真爱合种今日已浇水(" + myWatered + "g)")
+                        Log.forest("真爱合种今日已浇水(" + myWatered + "g)")
                     }
                 } else {
                     Log.error(TAG, "真爱合不知道什么勾八错误")

@@ -387,7 +387,7 @@ object Credit2101 {
 
                 val benefitArr = jo.optJSONArray("benefitTriggerVOS")
                 if (benefitArr == null || benefitArr.length() == 0) {
-                    Log.other(TAG, "信用2101🎁[开宝箱] 无详细奖励信息")//第$i 个
+                    Log.other( "信用2101🎁[开宝箱] 无详细奖励信息")//第$i 个
                     continue
                 }
 
@@ -418,7 +418,7 @@ object Credit2101 {
                 }
 
                 if (descList.isEmpty()) {
-                    Log.other(TAG, "信用2101🎁[开宝箱]第 $i 个")
+                    Log.other( "信用2101🎁[开宝箱]第 $i 个")
                 } else {
                     Log.other(
                         TAG,
@@ -493,9 +493,9 @@ object Credit2101 {
             } else null
 
             if (!desc.isNullOrEmpty()) {
-                Log.other(TAG, "信用2101🗓[签到成功] 获得$desc")
+                Log.other( "信用2101🗓[签到成功] 获得$desc")
             } else {
-                Log.other(TAG, "信用2101🗓[签到成功]")
+                Log.other( "信用2101🗓[签到成功]")
             }
 
         } catch (e: Throwable) {
@@ -550,7 +550,7 @@ object Credit2101 {
                                 cJo.optBoolean("operateSuccess", true)
                         if (ok) {
                             claimCount++
-                            Log.other(TAG, "信用2101📋[任务领取成功] $taskName ($taskConfigId)")
+                            Log.other( "信用2101📋[任务领取成功] $taskName ($taskConfigId)")
                         } else {
                             Log.runtime(TAG, "信用2101📋[任务领取失败] $taskName resp=$claimResp")
                         }
@@ -596,9 +596,9 @@ object Credit2101 {
 
                     awardCount++
                     if (!desc.isNullOrEmpty()) {
-                        Log.other(TAG, "信用2101📋[任务奖励领取成功] $taskName -> $desc")
+                        Log.other( "信用2101📋[任务奖励领取成功] $taskName -> $desc")
                     } else {
-                        Log.other(TAG, "信用2101📋[任务奖励领取成功] $taskName")
+                        Log.other( "信用2101📋[任务奖励领取成功] $taskName")
                     }
                 }
 
@@ -613,7 +613,7 @@ object Credit2101 {
                                 cJo.optBoolean("operateSuccess", true)
                         if (ok) {
                             claimCount++
-                            Log.other(TAG, "信用2101📋[分享任务完成] $taskName ($taskConfigId)")
+                            Log.other( "信用2101📋[分享任务完成] $taskName ($taskConfigId)")
                         } else {
                             Log.error(TAG, "信用2101📋[分享任务失败] $taskName resp=$PUSHResp")
                         }
@@ -676,9 +676,9 @@ object Credit2101 {
 
             if (cnt > 0) {
                 // 保持你统一的奖励展示风格
-                Log.other(TAG, "信用2101🛡️[修复奖励]获得 信用印记 x$cnt")
+                Log.other( "信用2101🛡️[修复奖励]获得 信用印记 x$cnt")
             } else {
-                Log.other(TAG, "信用2101🛡️[修复奖励]")
+                Log.other( "信用2101🛡️[修复奖励]")
             }
 
         } catch (e: Throwable) {
@@ -722,7 +722,7 @@ object Credit2101 {
             }
 
             if (descList.isNotEmpty()) {
-                Log.other(TAG, "回访🗓[可领取] ${descList.joinToString("，")}")
+                Log.other( "回访🗓[可领取] ${descList.joinToString("，")}")
             }
 
         } catch (e: Throwable) {
@@ -994,12 +994,12 @@ object Credit2101 {
             } else null
 
             if (!awardDesc.isNullOrEmpty()) {
-                Log.other(TAG, "信用2101🎮[小游戏E完成] 奖励: $awardDesc") // MINI_GAME_ELIMINATE
+                Log.other( "信用2101🎮[小游戏E完成] 奖励: $awardDesc") // MINI_GAME_ELIMINATE
             } else {
-                Log.other(TAG, "信用2101🎮[小游戏完成] (未获得奖励)")
+                Log.other( "信用2101🎮[小游戏完成] (未获得奖励)")
             }
 
-            // Log.other(TAG, "信用2101🎮[小游戏完成]")//MINI_GAME_ELIMINATE
+            // Log.other( "信用2101🎮[小游戏完成]")//MINI_GAME_ELIMINATE
         } catch (e: Throwable) {
             Log.printStackTrace(TAG, e)
         }
@@ -1088,9 +1088,9 @@ object Credit2101 {
             } else null
 
             if (!awardDesc.isNullOrEmpty()) {
-                Log.other(TAG, "信用2101🎮[小游戏完成Y] 奖励: $awardDesc") // MINI_GAME_ELIMINATE
+                Log.other( "信用2101🎮[小游戏完成Y] 奖励: $awardDesc") // MINI_GAME_ELIMINATE
             } else {
-                Log.other(TAG, "信用2101🎮[小游戏完成] (未获得奖励)")
+                Log.other( "信用2101🎮[小游戏完成] (未获得奖励)")
             }
 
         } catch (e: Throwable) {
@@ -1205,9 +1205,9 @@ object Credit2101 {
                         if (amount.isNotEmpty()) sb.append(" ").append(amount)
                     }
                 }
-                Log.other(TAG, "信用2101🎮[小游戏完成] $sb")
+                Log.other( "信用2101🎮[小游戏完成] $sb")
             } else {
-                Log.other(TAG, "信用2101🎮[小游戏完成] stage=$stageId")
+                Log.other( "信用2101🎮[小游戏完成] stage=$stageId")
             }
 
         } catch (e: Throwable) {
@@ -1324,12 +1324,12 @@ object Credit2101 {
                 val amount = detail?.optInt("amount", 0) ?: 0
 
                 if (amount > 0 && actionDesc.isNotEmpty()) {
-                    Log.other(TAG, "信用2101📖[故事事件完成] 获得增益 $actionDesc +$amount ($buffId)")
+                    Log.other( "信用2101📖[故事事件完成] 获得增益 $actionDesc +$amount ($buffId)")
                 } else {
-                    Log.other(TAG, "信用2101📖[故事事件完成] buff=$buffId")
+                    Log.other( "信用2101📖[故事事件完成] buff=$buffId")
                 }
             } else {
-                Log.other(TAG, "信用2101📖[故事事件完成]")
+                Log.other( "信用2101📖[故事事件完成]")
             }
         } catch (e: Throwable) {
             Log.printStackTrace(TAG, e)
@@ -1389,7 +1389,7 @@ object Credit2101 {
                     if (ResChecker.checkRes(TAG,joinResp)) {
                         usedEnergy += joinEnergy
                         currentProgress += joinEnergy
-                        Log.other(TAG, "信用2101⚫[黑印记] 已成功加入占位，注入 $joinEnergy (当前进度: $currentProgress/$total)")
+                        Log.other( "信用2101⚫[黑印记] 已成功加入占位，注入 $joinEnergy (当前进度: $currentProgress/$total)")
                     } else {
                         Log.record(TAG, "信用2101⚫[加入失败] 可能已被他人填满或过期")
                         return 0
@@ -1410,7 +1410,7 @@ object Credit2101 {
                     val chargeResp = Credit2101RpcCall.chargeBlackMarkEvent(remainNeed, eventId)
                     if (chargeResp.isNotEmpty() && JSONObject(chargeResp).optBoolean("success", false)) {
                         usedEnergy += remainNeed
-                        Log.other(TAG, "信用2101⚫[黑印记] 能量充足，已完成最终修复，注入 $remainNeed")
+                        Log.other( "信用2101⚫[黑印记] 能量充足，已完成最终修复，注入 $remainNeed")
                     }
                 } else {
                     // 如果不够注满，由于刚才已经 join 过了，这里直接结束
@@ -1489,7 +1489,7 @@ object Credit2101 {
 
                         usedEnergy += joinEnergy
                         current += joinEnergy
-                        Log.other(TAG, "信用2101⚫[黑印记] 已加入事件，注入$joinEnergy 能量")
+                        Log.other( "信用2101⚫[黑印记] 已加入事件，注入$joinEnergy 能量")
                     }
 
                     val remainNeed = total - current
@@ -1520,12 +1520,12 @@ object Credit2101 {
                         val type = item?.optString("benefitType", "") ?: ""
                         val count = item?.optInt("count", 0) ?: 0
                         if (count > 0) {
-                            Log.other(TAG, "信用2101⚫[黑印记修复成功] 奖励$type x$count")
+                            Log.other( "信用2101⚫[黑印记修复成功] 奖励$type x$count")
                         } else {
-                            Log.other(TAG, "信用2101⚫[黑印记修复成功]")
+                            Log.other( "信用2101⚫[黑印记修复成功]")
                         }
                     } else {
-                        Log.other(TAG, "信用2101⚫[黑印记修复成功]")
+                        Log.other( "信用2101⚫[黑印记修复成功]")
                     }
 
                     usedEnergy += remainNeed
@@ -1567,7 +1567,7 @@ object Credit2101 {
             if (type.isNotEmpty()) types.add(type)
         }
 
-        Log.other(TAG, "信用2101🔍[探测成功] 新事件$count 个，类型=${types.joinToString(",")}")
+        Log.other( "信用2101🔍[探测成功] 新事件$count 个，类型=${types.joinToString(",")}")
         return true
     }
 
@@ -1611,11 +1611,11 @@ object Credit2101 {
                 // 情况 A：数量凑齐了 (LOCKED -> 尝试合成)
                 if (awardStatus == "LOCKED" && obtainedCount >= cardCount && cardCount > 0) {
                     allFinished = false
-                    Log.other(TAG, "信用2101🎨[图鉴] [$name] 已集齐($obtainedCount/$cardCount)，正在合成...")
+                    Log.other( "信用2101🎨[图鉴] [$name] 已集齐($obtainedCount/$cardCount)，正在合成...")
 
                     val res = Credit2101RpcCall.completeChapterAction("CHAPTER_COMPLETE", chapterId)
                     if (ResChecker.checkRes(TAG, res)) {
-                        Log.other(TAG, "信用2101🎨[图鉴] [$name] 合成完成")
+                        Log.other( "信用2101🎨[图鉴] [$name] 合成完成")
                     } else {
                         Log.error(TAG, "信用2101🎨[图鉴] [$name] 合成请求失败, resp=$res")
                     }
@@ -1623,7 +1623,7 @@ object Credit2101 {
                 // 情况 B：已合成未领奖 (UNLOCKED -> 尝试领奖)
                 else if (awardStatus == "UNLOCKED") {
                     allFinished = false
-                    Log.other(TAG, "信用2101🎨[图鉴] [$name] 检测到待领取奖励...")
+                    Log.other( "信用2101🎨[图鉴] [$name] 检测到待领取奖励...")
 
                     val res =Credit2101RpcCall.completeChapterAction("CHAPTER_AWARD", chapterId)
                     val resJo = JSONObject(res)
@@ -1633,9 +1633,9 @@ object Credit2101 {
                             val type = gain.optString("awardType")
                             val amount = gain.optString("awardAmount")
                             val typeName = getItemName(type)
-                            Log.other(TAG, "信用2101🎨[图鉴] [$name] 奖励领取成功: $typeName x$amount")
+                            Log.other( "信用2101🎨[图鉴] [$name] 奖励领取成功: $typeName x$amount")
                         } else {
-                            Log.other(TAG, "信用2101🎨[图鉴] [$name] 奖励领取成功(未解析到具体奖励)")
+                            Log.other( "信用2101🎨[图鉴] [$name] 奖励领取成功(未解析到具体奖励)")
                         }
                     } else {
                         Log.error(TAG, "信用2101🎨[图鉴] [$name] 领奖请求失败, resp=$res")
@@ -1697,7 +1697,7 @@ object Credit2101 {
             }
 
             // 3. 开始升级流程
-            Log.other(TAG, "信用2101🎮[天赋] 发现 $availablePoint 点可用，开始升级...")
+            Log.other( "信用2101🎮[天赋] 发现 $availablePoint 点可用，开始升级...")
 
             while (availablePoint > 0 && upgradeableList.isNotEmpty()) {
                 // 随机选择一个未满级的天赋
@@ -1712,7 +1712,7 @@ object Credit2101 {
                 // 逻辑处理：EXPLORE_COUNT -> EXPLORE
                 val treeType = if (attrType.contains("_")) attrType.substringBefore("_") else attrType
 
-                Log.other(TAG, "信用2101🎮[天赋] 尝试升级 $talentName ($attrType) 至 $nextLevel 级")
+                Log.other( "信用2101🎮[天赋] 尝试升级 $talentName ($attrType) 至 $nextLevel 级")
 
                 val upgradeResp = Credit2101RpcCall.upgradeTalentAttribute(attrType, treeType, nextLevel)
 
@@ -1723,7 +1723,7 @@ object Credit2101 {
 
                 if (isSuccess) {
                     availablePoint--
-                    Log.other(TAG, "信用2101🎮[天赋] $talentName 升级成功！剩余点数: $availablePoint")
+                    Log.other( "信用2101🎮[天赋] $talentName 升级成功！剩余点数: $availablePoint")
 
                     // 更新本地列表状态
                     if (nextLevel >= 5) {

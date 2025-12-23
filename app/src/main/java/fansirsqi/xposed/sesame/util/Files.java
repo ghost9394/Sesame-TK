@@ -649,10 +649,8 @@ public class Files {
         if (!file.exists()) {
             return false; // 如果文件不存在，则返回 false
         }
-        
-        FileWriter fileWriter = null;
-        try {
-            fileWriter = new FileWriter(file);
+
+        try (FileWriter fileWriter = new FileWriter(file)) {
             // 使用 FileWriter 清空文件内容
             fileWriter.write(""); // 写入空字符串，清空文件内容
             fileWriter.flush(); // 刷新缓存，确保内容写入文件
@@ -660,18 +658,10 @@ public class Files {
         } catch (IOException e) {
             Log.printStackTrace(e);
             return false;
-        } finally {
-            // 安全关闭流，忽略 close 时的权限异常
-            if (fileWriter != null) {
-                try {
-                    fileWriter.close();
-                } catch (IOException e) {
-                    // 捕获 close 时的异常（包括 EPERM）
-                    // 数据已经 flush，close 失败不影响清空结果
-                    Log.debug(TAG, "文件关闭异常（数据已清空）: " + e.getMessage());
-                }
-            }
         }
+        // 安全关闭流，忽略 close 时的权限异常
+        // 捕获 close 时的异常（包括 EPERM）
+        // 数据已经 flush，close 失败不影响清空结果
     }
 
     /**

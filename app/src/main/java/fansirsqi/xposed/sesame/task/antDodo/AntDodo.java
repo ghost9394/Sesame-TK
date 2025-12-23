@@ -298,7 +298,7 @@ public class AntDodo extends ModelTask {
                                 // 调用带 animalId 的消耗方法
                                 String res = AntDodoRpcCall.consumeProp(pId, propType, animalId);
                                 if (ResChecker.checkRes(TAG, res)) {
-                                    Log.forest(TAG, "万能卡使用成功，补全动物ID: " + animalId);
+                                    Log.forest( "万能卡使用成功，补全动物ID: " + animalId);
                                 }
                                 GlobalThreadPools.sleepCompat(2*1000L);
                             }

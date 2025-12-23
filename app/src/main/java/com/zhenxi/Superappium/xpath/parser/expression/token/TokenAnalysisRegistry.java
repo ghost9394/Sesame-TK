@@ -9,8 +9,8 @@ import java.util.Map;
 import java.util.TreeSet;
 
 public class TokenAnalysisRegistry {
-    /*  27 */   private static TreeSet<TokenConsumerWrapper> allConsumer = new TreeSet();
-    /*  28 */   private static Map<String, TokenHandler> allHandler = new HashMap();
+    /*  27 */   private static final TreeSet<TokenConsumerWrapper> allConsumer = new TreeSet<>();
+    /*  28 */   private static final Map<String, TokenHandler> allHandler = new HashMap<>();
 
     static {
         /*  31 */

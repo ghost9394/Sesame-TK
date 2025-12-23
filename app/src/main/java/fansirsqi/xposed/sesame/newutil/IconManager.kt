@@ -12,6 +12,9 @@ object IconManager {
     const val COMPONENT_DEFAULT = General.MODULE_PACKAGE_UI_ICON
     const val COMPONENT_CHRISTMAS = General.MODULE_PACKAGE_UI_ICON + "Christmas" // 或者你自己定义的字符串
 
+    val emoji = listOf("🎅", "🎄", "🎁", "✨", "❄️")
+    val randomEmoji = emoji.random()
+
     /**
      * 核心方法：根据“用户是否想隐藏”和“当前日期”来决定最终状态
      * @param context 上下文
@@ -32,13 +35,14 @@ object IconManager {
             // 圣诞节：启用圣诞版，禁用默认版
             enableComponent(context, pm, COMPONENT_CHRISTMAS)
             disableComponent(context, pm, COMPONENT_DEFAULT)
-            val emoji = listOf("🎅", "🎄", "🎁", "✨", "❄️")
-            val randomEmoji = emoji.random()
+
             ToastUtil.showToast(context, "$randomEmoji 圣诞快乐!")
         } else {
             // 平时：启用默认版，禁用圣诞版
             enableComponent(context, pm, COMPONENT_DEFAULT)
             disableComponent(context, pm, COMPONENT_CHRISTMAS)
+
+            ToastUtil.showToast(context, "欢迎回来!")
         }
     }
 
@@ -46,8 +50,7 @@ object IconManager {
         val calendar = java.util.Calendar.getInstance()
         val month = calendar.get(java.util.Calendar.MONTH) + 1
         val day = calendar.get(java.util.Calendar.DAY_OF_MONTH)
-        // 12月24日 - 12月26日
-        return month == 12 && (day in 22..31)
+        return month == 12 && (day in 25..25)
     }
 
     private fun enableComponent(context: Context, pm: PackageManager, className: String) {

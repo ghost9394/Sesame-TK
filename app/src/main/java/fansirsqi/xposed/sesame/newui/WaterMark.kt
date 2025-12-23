@@ -32,7 +32,7 @@ class WatermarkView(context: Context) : View(context) {
             val prefixLines = mutableListOf(
                 "免费模块仅供学习,勿在国内平台传播!!"
             )
-            val suffix = "${TimeUtil.getFormatDateTime()}"
+            val suffix = "Now: ${TimeUtil.getFormatDateTime()}"
             val uidLines = if (verifuids.isEmpty()) {
                 listOf(
                     "未载入账号",
@@ -166,8 +166,9 @@ class WatermarkView(context: Context) : View(context) {
 
         /** 模块版本和构建时间的固定信息行 */
         private val versionLines = listOf(
-            "版本信息: ${BuildConfig.VERSION_NAME}.${BuildConfig.BUILD_TYPE} 📦",
-            "构建时间: ${BuildConfig.BUILD_DATE} ${BuildConfig.BUILD_TIME} ⏰"
+            "Ver: ${BuildConfig.VERSION_NAME}.${BuildConfig.BUILD_TYPE} 📦",
+            "Build: ${BuildConfig.BUILD_DATE} ${BuildConfig.BUILD_TIME} ⏰",
+            "免费模块仅供学习,勿在国内平台传播!!"
         )
     }
 }

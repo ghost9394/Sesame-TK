@@ -20,6 +20,7 @@ import android.webkit.WebView;
 import android.widget.AdapterView;
 import android.widget.TextView;
 import de.robv.android.xposed.XposedHelpers;
+import lombok.Getter;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -29,6 +30,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import static android.view.MotionEvent.TOOL_TYPE_FINGER;
 
 public class ViewImage {
+    @Getter
     private View originView;
     private Map<String, LazyValueGetter> attributes;
     private ViewImage parent = null;
@@ -102,20 +104,15 @@ public class ViewImage {
         return locationOnScreen()[1];
     }
 
-    public View getOriginView() {
-        return originView;
-    }
-
     private Integer theChildCount = null;
 
     public int childCount() {
         if (theChildCount != null) {
             return theChildCount;
         }
-        if (!(originView instanceof ViewGroup)) {
+        if (!(originView instanceof ViewGroup viewGroup)) {
             return 0;
         }
-        ViewGroup viewGroup = (ViewGroup) originView;
         theChildCount = viewGroup.getChildCount();
         return theChildCount;
     }
@@ -324,7 +321,7 @@ public class ViewImage {
     public boolean clickByXpath(String xpath) {
 
         ViewImages viewImages = xpath(xpath);
-        if (viewImages.size() == 0) {
+        if (viewImages.isEmpty()) {
             ViewImage viewImage = PageManager.tryGetTopView(xpath);
             if(viewImage==null){
                 return false;
@@ -345,7 +342,7 @@ public class ViewImage {
      */
     public boolean typeByXpath(String xpathExpression, String content) {
         ViewImages viewImages = xpath(xpathExpression);
-        if (viewImages.size() == 0) {
+        if (viewImages.isEmpty()) {
             return false;
         }
         View originView = viewImages.get(0).getOriginView();
@@ -437,7 +434,7 @@ public class ViewImage {
         return clickByPoint(floats[0], floats[1]);
     }
 
-    private static Random random = new Random();
+    private static final Random random = new Random();
 
     private float[] measureClickPoint() {
         int[] locs = new int[2];
