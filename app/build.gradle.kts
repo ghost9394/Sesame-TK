@@ -147,6 +147,9 @@ dependencies {
     implementation(libs.rikka.shizuku.provider)   // Shizuku 提供者
     implementation(libs.rikka.refine)             // Rikka 反射工具
     implementation(libs.ui.tooling.preview.android)
+    implementation (libs.androidx.fragment)
+    compileOnly(libs.android)
+    implementation(libs.fastjson)
 
     // Compose 相关依赖 - 现代化 UI 框架
     val composeBom = platform("androidx.compose:compose-bom:2025.12.00")  // Compose BOM 版本管理

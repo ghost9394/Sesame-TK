@@ -69,6 +69,7 @@ public class AntSports extends ModelTask {
     // 记录训练好友获得0金币的次数
     private int zeroTrainCoinCount = 0;
 
+
     //健康岛任务
     private BooleanModelField neverlandTask;  //健康岛任务
     private BooleanModelField neverlandGrid;    //健康岛走路
@@ -89,6 +90,7 @@ public class AntSports extends ModelTask {
     public String getIcon() {
         return "AntSports.png";
     }
+
 
     @Override
     public ModelFields getFields() {
@@ -1702,10 +1704,6 @@ public class AntSports extends ModelTask {
             }
         }
 
-        // -------------------------------------------------------------------------
-        // 2. 新增：循环处理任务大厅（核心优化）
-        // -------------------------------------------------------------------------
-
         /**
          * 循环处理任务大厅：完成一批任务后重新获取列表，直到无待完成任务或达到失败次数限制
          * 只处理 PROMOKERNEL_TASK 和 LIGHT_TASK
@@ -1735,23 +1733,38 @@ public class AntSports extends ModelTask {
                         Log.other(TAG, "任务中心为空，无任务可处理");
                         break;
                     }
+// 2. 筛选逻辑修改
+List<JSONObject> pendingTasks = new ArrayList<>();
+for (int i = 0; i < taskList.length(); i++) {
+    JSONObject task = taskList.optJSONObject(i);
+    if (task == null) continue;
 
-                    // 2. 筛选：只要是 PROMOKERNEL_TASK 或 LIGHT_TASK，且状态不是“已完成(FINISHED)”的任务
-                    List<JSONObject> pendingTasks = new ArrayList<>();
-                    for (int i = 0; i < taskList.length(); i++) {
-                        JSONObject task = taskList.optJSONObject(i);
-                        if (task == null) continue;
+    String title = task.optString("title", task.optString("taskName", "未知任务"));
+    String type = task.optString("taskType", "");
+    String status = task.optString("taskStatus", "");
+    String taskId = task.optString("id", task.optString("taskId", ""));
 
-                        String type = task.optString("taskType", "");
-                        String status = task.optString("taskStatus", "");
+    // --- 核心修改：拦截并拉黑 NOT_SIGNUP ---
+    if ("NOT_SIGNUP".equals(status)) {
+        Log.record(TAG, "任务 [" + title + "] 需要手动报名，已自动拉黑并跳过");
+        if (!taskId.isEmpty()) {
+            TaskBlacklist.INSTANCE.addToBlacklist(taskId, title);
+        }
+        continue; // 直接跳过，不加入待处理列表
+    }
 
-                        // 过滤类型，且排除掉已经彻底完成的状态（假设 FINISHED 是终态）
-                        if (("PROMOKERNEL_TASK".equals(type) || "LIGHT_TASK".equals(type))
-                                && !"FINISHED".equals(status)) {
-                            pendingTasks.add(task);
-                        }
-                    }
+    // 检查是否已经在黑名单中
+    if (TaskBlacklist.INSTANCE.isTaskInBlacklist(taskId)) {
+        continue;
+    }
+    // ------------------------------------
 
+    // 原有的类型过滤逻辑
+    if (("PROMOKERNEL_TASK".equals(type) || "LIGHT_TASK".equals(type))
+            && !"FINISHED".equals(status)) {
+        pendingTasks.add(task);
+    }
+}
                     if (pendingTasks.isEmpty()) {
                         Log.record(TAG, "没有可处理或领取的任务，退出循环");
                         break;
@@ -2805,6 +2818,7 @@ private boolean handleLightTask(JSONObject task, String title, String jumpLink) 
         // -------------------------------------------------------------------------
         // 工具函数（bizId提取逻辑无变更）
         // -------------------------------------------------------------------------
+
         private String extractBizIdFromJumpLink(String jumpLink) {
             if (jumpLink == null || jumpLink.isEmpty()) return null;
 

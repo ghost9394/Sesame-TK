@@ -1,5 +1,6 @@
 package fansirsqi.xposed.sesame.hook;
 
+import com.zhenxi.Superappium.PageManager;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Application;
@@ -491,6 +492,8 @@ public class ApplicationHook {
             Log.printStackTrace(TAG, "验证码Hook初始化失败", t);
         }
 
+        PageManager.addHandler("com.alipay.mobile.nebulax.xriver.activity.XRiverActivity",
+                new CaptchaHandler());
         try {
             // 在Hook Application.attach 之前，先 deoptimize LoadedApk.makeApplicationInner
             try {
@@ -623,6 +626,8 @@ public class ApplicationHook {
                             if (!General.CURRENT_USING_SERVICE.equals(appService.getClass().getCanonicalName())) {
                                 return;
                             }
+
+
 
                             Log.runtime(TAG, "Service onCreate");
                             appContext = appService.getApplicationContext();
