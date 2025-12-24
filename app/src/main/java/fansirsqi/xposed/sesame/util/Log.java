@@ -24,6 +24,7 @@ public class Log {
     private static final Logger OTHER_LOGGER;
     private static final Logger ERROR_LOGGER;
     private static final Logger CAPTURE_LOGGER;
+    private static final Logger CAPTCHA_LOGGER;
 
     // 错误去重机制：记录错误特征和出现次数
     private static final Map<String, AtomicInteger> errorCountMap = new ConcurrentHashMap<>();
@@ -40,6 +41,7 @@ public class Log {
         OTHER_LOGGER = LoggerFactory.getLogger("other");
         ERROR_LOGGER = LoggerFactory.getLogger("error");
         CAPTURE_LOGGER = LoggerFactory.getLogger("capture");
+        CAPTCHA_LOGGER = LoggerFactory.getLogger("captcha");
     }
 
     private static String truncateLogmsg(String msg) {
@@ -93,10 +95,6 @@ public class Log {
         FARM_LOGGER.info("{}", msg);
     }
 
-    public static void farm(String TAG, String msg) {
-        farm("[" + TAG + "]: " + msg);
-    }
-
     public static void other(String msg) {
         record(msg);
         OTHER_LOGGER.info("{}", msg);
@@ -130,6 +128,15 @@ public class Log {
 
     public static void capture(String TAG, String msg) {
         capture("[" + TAG + "]: " + msg);
+    }
+
+    public static void captcha(String msg) {
+        runtime(msg);
+        CAPTCHA_LOGGER.info("{}", msg);
+    }
+
+    public static void captcha(String TAG, String msg) {
+        captcha("[" + TAG + "]: " + msg);
     }
 
     /**
@@ -197,13 +204,6 @@ public class Log {
         if (shouldPrintError(e)) return;
         String stackTrace = "[" + TAG + "] Throwable error: " + android.util.Log.getStackTraceString(e);
         error(msg, stackTrace);
-    }
-
-    /**
-     * 清除错误计数缓存（可在任务重新开始时调用）
-     */
-    public static void clearErrorCount() {
-        errorCountMap.clear();
     }
 
     public static void printStack(String TAG) {

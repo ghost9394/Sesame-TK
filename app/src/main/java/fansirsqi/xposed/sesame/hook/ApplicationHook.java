@@ -910,58 +910,54 @@ public class ApplicationHook {
                 }
 
                 // 注册 VIPHook handler，用于抓取蚂蚁庄园广告 referToken
-                VIPHook.INSTANCE.registerRpcHandler("com.alipay.adexchange.ad.facade.xlightPlugin", new kotlin.jvm.functions.Function1<JSONObject, Unit>() {
-                    @Override
-                    public Unit invoke(JSONObject paramsJson) {
-                        try {
-
-                            // paramsJson 就是完整 RPC 数据
-                            // 找 positionRequest → referInfo → referToken
-                            JSONObject positionRequest = paramsJson.optJSONObject("positionRequest");
-                            if (positionRequest == null) {
-                                Log.error("VIPHook", "未找到 positionRequest");
-                                return Unit.INSTANCE;
-                            }
-
-                            JSONObject referInfo = positionRequest.optJSONObject("referInfo");
-                            if (referInfo == null) {
-                                Log.error("VIPHook", "未找到 referInfo");
-                                return Unit.INSTANCE;
-                            }
-
-                            String token = referInfo.optString("referToken", "");
-                            if (token.isEmpty()) {
-                                Log.error("VIPHook", "referToken 为空");
-                                return Unit.INSTANCE;
-                            }
-
-                            // 取得当前用户 UID
-                            String userId = UserMap.INSTANCE.getCurrentUid();
-                            if (userId == null || userId.isEmpty()) {
-                                Log.error("VIPHook", "无法保存 referToken：当前用户ID为空");
-                                return Unit.INSTANCE;
-                            }
-
-                            // --- 与你的 fishpond riskToken 完全一样的保存逻辑 ---
-                            VipDataIdMap vipData = IdMapManager.getInstance(VipDataIdMap.class);
-                            vipData.load(userId);
-
-                            // 存储键名：AntFarmReferToken
-                            vipData.add("AntFarmReferToken", token);
-
-                            boolean saved = vipData.save(userId);
-                            if (saved) {
-                                Log.other("VIPHook", "捕获到蚂蚁庄园 referToken 并已保存到 vipdata.json, uid=" + userId);
-                            } else {
-                                Log.error("VIPHook", "保存 vipdata.json 失败, uid=" + userId);
-                            }
-
-                        } catch (Exception e) {
-                            Log.error("VIPHook", "解析 referToken 失败: " + e.getMessage());
+                VIPHook.INSTANCE.registerRpcHandler("com.alipay.adexchange.ad.facade.xlightPlugin", paramsJson -> {
+                    try {
+                        // paramsJson 就是完整 RPC 数据
+                        // 找 positionRequest → referInfo → referToken
+                        JSONObject positionRequest = paramsJson.optJSONObject("positionRequest");
+                        if (positionRequest == null) {
+                            Log.error("VIPHook", "未找到 positionRequest");
+                            return Unit.INSTANCE;
                         }
 
-                        return Unit.INSTANCE;
+                        JSONObject referInfo = positionRequest.optJSONObject("referInfo");
+                        if (referInfo == null) {
+                            Log.error("VIPHook", "未找到 referInfo");
+                            return Unit.INSTANCE;
+                        }
+
+                        String token = referInfo.optString("referToken", "");
+                        if (token.isEmpty()) {
+                            Log.error("VIPHook", "referToken 为空");
+                            return Unit.INSTANCE;
+                        }
+
+                        // 取得当前用户 UID
+                        String userId1 = UserMap.INSTANCE.getCurrentUid();
+                        if (userId1 == null || userId1.isEmpty()) {
+                            Log.error("VIPHook", "无法保存 referToken：当前用户ID为空");
+                            return Unit.INSTANCE;
+                        }
+
+                        // --- 与你的 fishpond riskToken 完全一样的保存逻辑 ---
+                        VipDataIdMap vipData = IdMapManager.getInstance(VipDataIdMap.class);
+                        vipData.load(userId1);
+
+                        // 存储键名：AntFarmReferToken
+                        vipData.add("AntFarmReferToken", token);
+
+                        boolean saved = vipData.save(userId1);
+                        if (saved) {
+                            Log.other("VIPHook", "捕获到蚂蚁庄园 referToken 并已保存到 vipdata.json, uid=" + userId1);
+                        } else {
+                            Log.error("VIPHook", "保存 vipdata.json 失败, uid=" + userId1);
+                        }
+
+                    } catch (Exception e) {
+                        Log.error("VIPHook", "解析 referToken 失败: " + e.getMessage());
                     }
+
+                    return Unit.INSTANCE;
                 });
 
                 // 后台运行权限检查!!

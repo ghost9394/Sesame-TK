@@ -60,7 +60,6 @@ object AntOrchardRpcCall {
      * @param source 来源标识，可自定义
      * @param useBatchSpread 一键5次
      */
-    @JvmStatic  // 重点：让 Java 能直接用类名调用
     fun orchardSpreadManure(wua: String, source: String,useBatchSpread : Boolean=false): String {
         return RequestManager.requestString(
             "com.alipay.antfarm.orchardSpreadManure",

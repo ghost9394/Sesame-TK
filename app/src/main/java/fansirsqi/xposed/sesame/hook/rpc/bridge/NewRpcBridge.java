@@ -1,6 +1,8 @@
 package fansirsqi.xposed.sesame.hook.rpc.bridge;
 
-import fansirsqi.xposed.sesame.util.CoroutineUtils;
+import fansirsqi.xposed.sesame.hook.Toast;
+import fansirsqi.xposed.sesame.util.*;
+
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
@@ -16,11 +18,6 @@ import fansirsqi.xposed.sesame.entity.RpcEntity;
 import fansirsqi.xposed.sesame.hook.ApplicationHook;
 import fansirsqi.xposed.sesame.hook.rpc.intervallimit.RpcIntervalLimit;
 import fansirsqi.xposed.sesame.model.BaseModel;
-import fansirsqi.xposed.sesame.util.GlobalThreadPools;
-import fansirsqi.xposed.sesame.util.Log;
-import fansirsqi.xposed.sesame.util.Notify;
-import fansirsqi.xposed.sesame.util.RandomUtil;
-import fansirsqi.xposed.sesame.util.TimeUtil;
 
 /**
  * 新版rpc接口，支持最低支付宝版本v10.3.96.8100 记录rpc抓包，支持最低支付宝版本v10.3.96.8100
@@ -291,6 +288,15 @@ public class NewRpcBridge implements RpcBridge {
                         String errorMessage = (String) XposedHelpers.callMethod(rpcEntity.getResponseObject(), "getString", "errorMessage");
                         String response = rpcEntity.getResponseString();
                         String methodName = rpcEntity.getRequestMethod();
+
+                        // 检测安全验证错误，自动启动支付宝
+                        if (errorMessage != null && errorMessage.contains("为了保障您的操作安全，请进行验证后继续")) {
+                            Log.error(TAG, "检测到安全验证错误，自动启动支付宝进行滑块中...");
+                            Toast.INSTANCE.show(
+                                    "检测到安全验证错误，自动启动支付宝进行滑块中..."
+                            );
+                            SwipeUtil.startAlipaySync(ApplicationHook.getAppContext());
+                        }
 
                         if (errorMark.contains(errorCode) || errorStringMark.contains(errorMessage)) {
                             int currentErrorCount = maxErrorCount.incrementAndGet();

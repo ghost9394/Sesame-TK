@@ -68,7 +68,7 @@ public class AntOcean extends ModelTask {
                     return action;
                 }
             }
-            // 可选：记录日志或处理未知状态
+            // 可选:记录日志或处理未知状态
             Log.error("ApplyAction", "Unknown applyAction: " + value);
             return null; // 或者返回一个 UNKNOWN 枚举项
         }
@@ -163,10 +163,10 @@ public class AntOcean extends ModelTask {
     @Override
     public Boolean check() {
         if (TaskCommon.IS_ENERGY_TIME) {
-            Log.record(TAG, "⏸ 当前为只收能量时间【" + BaseModel.Companion.getEnergyTime().getValue() + "】，停止执行" + getName() + "任务！");
+            Log.record(TAG, "⏸ 当前为只收能量时间[" + BaseModel.Companion.getEnergyTime().getValue() + "],停止执行" + getName() + "任务!");
             return false;
         } else if (TaskCommon.IS_MODULE_SLEEP_TIME) {
-            Log.record(TAG, "💤 模块休眠时间【" + BaseModel.Companion.getModelSleepTime().getValue() + "】停止执行" + getName() + "任务！");
+            Log.record(TAG, "💤 模块休眠时间[" + BaseModel.Companion.getModelSleepTime().getValue() + "]停止执行" + getName() + "任务!");
             return false;
         } else {
             return true;
@@ -211,11 +211,11 @@ public class AntOcean extends ModelTask {
     }
 
     /**
-     * 初始化沙滩任务。
-     * 通过调用 AntOceanRpc 接口查询养成列表，
-     * 并将符合条件的任务加入 BeachMap。
-     * 条件：养成项目的类型必须为 BEACH、COOPERATE_SEA_TREE 或 SEA_ANIMAL，
-     * 并且其状态为 AVAILABLE。最后将符合条件的任务保存到 BeachMap 中。
+     * 初始化沙滩任务.
+     * 通过调用 AntOceanRpc 接口查询养成列表,
+     * 并将符合条件的任务加入 BeachMap.
+     * 条件:养成项目的类型必须为 BEACH,COOPERATE_SEA_TREE 或 SEA_ANIMAL,
+     * 并且其状态为 AVAILABLE.最后将符合条件的任务保存到 BeachMap 中.
      */
     public static void initBeach() {
         try {
@@ -248,7 +248,7 @@ public class AntOcean extends ModelTask {
                             }
                         }
                     }
-                    Log.runtime(TAG, "初始化沙滩数据成功。");
+                    Log.runtime(TAG, "初始化沙滩数据成功.");
                 }
                 // 将所有筛选结果保存到 BeachMap
                 IdMapManager.getInstance(BeachMap.class).save();
@@ -256,7 +256,7 @@ public class AntOcean extends ModelTask {
                 Log.runtime(jsonResponse.optString("resultDesc", "未知错误"));
             }
         } catch (JSONException e) {
-            Log.printStackTrace(TAG, "JSON 解析错误：", e);
+            Log.printStackTrace(TAG, "JSON 解析错误:", e);
             IdMapManager.getInstance(BeachMap.class).load(); // 若出现异常则加载保存的 BeachMap 备份
         } catch (Exception e) {
             Log.printStackTrace(TAG, "初始化沙滩任务时出错", e);
@@ -270,7 +270,7 @@ public class AntOcean extends ModelTask {
             if (ResChecker.checkRes(TAG, jo)) {
                 if (!jo.getBoolean("opened")) {
                     getEnableField().setValue(false);
-                    Log.record("请先开启神奇海洋，并完成引导教程");
+                    Log.record("请先开启神奇海洋,并完成引导教程");
                     return false;
                 }
                 initBeach();
@@ -647,7 +647,7 @@ public class AntOcean extends ModelTask {
                 String s = AntOceanRpcCall.queryTaskList();
                 JSONObject jo = new JSONObject(s);
                 if (!ResChecker.checkRes(TAG, jo)) {
-                    Log.error(TAG, "查询任务列表失败：" + jo.getString("resultDesc"));
+                    Log.error(TAG, "查询任务列表失败:" + jo.getString("resultDesc"));
                 }
                 JSONArray jaTaskList = jo.getJSONArray("antOceanTaskVOList");
                 for (int i = 0; i < jaTaskList.length(); i++) {
@@ -665,12 +665,12 @@ public class AntOcean extends ModelTask {
                             Log.forest("海洋奖励🌊[" + taskTitle + "]# " + awardCount + "拼图");
                             done = true;
                         } else {
-                            Log.error(TAG, "海洋奖励🌊领取失败：" + joAward);
+                            Log.error(TAG, "海洋奖励🌊领取失败:" + joAward);
                         }
                     } else if (TaskStatus.TODO.name().equals(taskStatus)) {
                         // 使用通用黑名单检查任务是否在黑名单中
                         if (TaskBlacklist.INSTANCE.isTaskInBlacklist(taskTitle)) {
-                            Log.record(TAG, "海洋任务🌊[" + taskTitle + "]已在黑名单中，跳过处理");
+                            Log.record(TAG, "海洋任务🌊[" + taskTitle + "]已在黑名单中,跳过处理");
                             continue;
                         }
                         if (taskTitle.contains("答题")) {
@@ -682,14 +682,14 @@ public class AntOcean extends ModelTask {
                                     .incrementAndGet();
 
                          JSONObject joFinishTask = new JSONObject(AntOceanRpcCall.finishTask(sceneCode, taskType));
-                        // 获取错误码，用于自动加入黑名单
+                        // 获取错误码,用于自动加入黑名单
                         String errorCode = joFinishTask.optString("code", "");
                         String desc = joFinishTask.optString("desc", "");
                         
                         // 自动根据错误码加入黑名单
                         TaskBlacklist.INSTANCE.autoAddToBlacklist(sceneCode, taskTitle, errorCode);
                         
-                        // 检查特定错误码：不支持RPC完成的任务，直接跳过
+                        // 检查特定错误码:不支持RPC完成的任务,直接跳过
                         if ("400000040".equals(errorCode) || desc.contains("不支持RPC完成")) {
                             continue;
                         }
@@ -702,7 +702,7 @@ public class AntOcean extends ModelTask {
                                 Log.forest("海洋任务🌊完成[" + taskTitle + "]");
                                 done = true;
                             } else {
-                                Log.error(TAG, "海洋任务🌊完成失败：" + joFinishTask);
+                                Log.error(TAG, "海洋任务🌊完成失败:" + joFinishTask);
                             }
                         }
                         }
@@ -726,7 +726,7 @@ public class AntOcean extends ModelTask {
             String questionResponse = AntOceanRpcCall.getQuestion();
             JSONObject questionJson = new JSONObject(questionResponse);
             if (questionJson.getBoolean("answered")) {
-                Log.runtime(TAG, "问题已经被回答过，跳过答题流程");
+                Log.runtime(TAG, "问题已经被回答过,跳过答题流程");
                 return;
             }
             if (questionJson.getInt("resultCode") == 200) {
@@ -739,10 +739,10 @@ public class AntOcean extends ModelTask {
                 if (submitJson.getInt("resultCode") == 200) {
                     Log.forest( "🌊海洋答题成功");
                 } else {
-                    Log.error(TAG, "海洋答题失败：" + submitJson);
+                    Log.error(TAG, "海洋答题失败:" + submitJson);
                 }
             } else {
-                Log.error(TAG, "海洋获取问题失败：" + questionJson);
+                Log.error(TAG, "海洋获取问题失败:" + questionJson);
             }
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "answerQuestion err", t);
@@ -781,7 +781,7 @@ public class AntOcean extends ModelTask {
                             if (receiveTaskJson.has("message")) {
                                 Log.error(TAG, "领取任务奖励失败: " + receiveTaskJson.getString("message"));
                             } else {
-                                Log.error(TAG, "领取任务奖励失败，未返回错误信息");
+                                Log.error(TAG, "领取任务奖励失败,未返回错误信息");
                             }
                         }
                     }
@@ -848,7 +848,7 @@ public class AntOcean extends ModelTask {
                     Log.forest(str);
                     GlobalThreadPools.sleepCompat(300);
                 } else {
-                    Log.error("保护海洋生态🏖️[" + itemName + "]#发生未知错误，停止申请");
+                    Log.error("保护海洋生态🏖️[" + itemName + "]#发生未知错误,停止申请");
                     break;
                 }
                 appliedTimes = queryCultivationDetail(cultivationCode, projectCode, count);
@@ -907,11 +907,11 @@ public class AntOcean extends ModelTask {
                 if (ResChecker.checkRes(TAG, propListObj)) {
                     // 获取道具重复数量
                     int duplicatePieceNum = propListObj.getInt("duplicatePieceNum");
-                    // 如果道具重复数量小于10，直接返回并停止循环
+                    // 如果道具重复数量小于10,直接返回并停止循环
                     if (duplicatePieceNum < 10) {
                         return;
                     }
-                    // 如果道具重复数量大于等于10，则执行道具兑换操作
+                    // 如果道具重复数量大于等于10,则执行道具兑换操作
                     String exchangeResultJson = AntOceanRpcCall.exchangeProp();
                     JSONObject exchangeResultObj = new JSONObject(exchangeResultJson);
                     // 获取兑换后的碎片数量和兑换数量
@@ -925,7 +925,7 @@ public class AntOcean extends ModelTask {
                         GlobalThreadPools.sleepCompat(1000);
                     }
                 } else {
-                    // 如果未成功获取道具列表，停止循环
+                    // 如果未成功获取道具列表,停止循环
                     shouldContinue = false;
                 }
             }
@@ -947,7 +947,7 @@ public class AntOcean extends ModelTask {
                 for (int i = 0; i < oceanPropVOByTypeList.length(); i++) {
                     JSONObject propInfo = oceanPropVOByTypeList.getJSONObject(i);
                     int holdsNum = propInfo.getInt("holdsNum");
-                    // 只要holdsNum大于0，就继续执行循环操作
+                    // 只要holdsNum大于0,就继续执行循环操作
                     int pageNum = 0;
                     th:
                     while (holdsNum > 0) {
@@ -957,7 +957,7 @@ public class AntOcean extends ModelTask {
                         JSONObject fishListObj = new JSONObject(fishListJson);
                         // 检查是否成功获取到鱼列表并且 hasMore 为 true
                         if (!ResChecker.checkRes(TAG, fishListObj)) {
-                            // 如果没有成功获取到鱼列表或者 hasMore 为 false，则停止后续操作
+                            // 如果没有成功获取到鱼列表或者 hasMore 为 false,则停止后续操作
                             break;
                         }
                         // 获取鱼列表中的fishVOS数组
@@ -965,7 +965,7 @@ public class AntOcean extends ModelTask {
                         if (fishVOS == null) {
                             break;
                         }
-                        // 遍历fishVOS数组，寻找pieces中num值为0的鱼的order和id
+                        // 遍历fishVOS数组,寻找pieces中num值为0的鱼的order和id
                         for (int j = 0; j < fishVOS.length(); j++) {
                             JSONObject fish = fishVOS.getJSONObject(j);
                             JSONArray pieces = fish.optJSONArray("pieces");
@@ -990,7 +990,7 @@ public class AntOcean extends ModelTask {
                                 JSONObject usePropResultObj = new JSONObject(usePropResult);
                                 if (ResChecker.checkRes(TAG, usePropResultObj)) {
                                     int userCount = idSet.size();
-                                    Log.forest("神奇海洋🏖️[万能拼图]使用" + userCount + "张，获得[" + name + "]剩余" + holdsNum + "张");
+                                    Log.forest("神奇海洋🏖️[万能拼图]使用" + userCount + "张,获得[" + name + "]剩余" + holdsNum + "张");
                                     GlobalThreadPools.sleepCompat(1000);
                                     if (holdsNum <= 0) {
                                         break th;

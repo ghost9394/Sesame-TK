@@ -13,6 +13,7 @@ class SesameApplication : Application() {
 
     companion object {
         private const val TAG = "SesameApplication"
+        var preferencesKey = "sesame-tk"
     }
 
     override fun onCreate() {

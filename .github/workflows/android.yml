@@ -150,14 +150,6 @@ jobs:
           sha256sum ${{ steps.extract_apks.outputs.signed_x86_64 }} > CHECKSUMS-Sesame-x86_64-${{ steps.extract_info.outputs.version }}.apk.sha256
           sha256sum ${{ steps.extract_apks.outputs.signed_universal }} > CHECKSUMS-Sesame-universal-${{ steps.extract_info.outputs.version }}.apk.sha256
 
-      - name: ✨ Create Tag from Version
-        if: startsWith(github.ref, 'refs/heads/n') && github.event_name == 'push'
-        run: |
-          VERSION_TAG="${{ steps.extract_info.outputs.version }}"
-          echo "Creating tag: $VERSION_TAG"
-          git tag "$VERSION_TAG"
-          git push origin "$VERSION_TAG"
-
       - name: 📝 Generate Dynamic Message
         id: commit_info
         shell: bash
@@ -221,11 +213,9 @@ jobs:
           draft: false
           append_body: true
           make_latest: true
-          generate_release_notes: true
+          generate_release_notes: false
           body: |
             ## ✨What's Changed
-
-            ${{ steps.commit_info.outputs.message_string }}
 
             > ## 下载说明
             <b>- arm64-v8a:</b> 适用于64位ARM设备 (主流新手机)
@@ -259,8 +249,6 @@ jobs:
           body: |
             📦 内容同步自源仓库 [Sesame-TK](https://github.com/${{ github.repository }})     
             ## ✨What's Changed
-            
-            ${{ steps.commit_info.outputs.message_string }}
             
             > ## 下载说明
             <b>- arm64-v8a:</b> 适用于64位ARM设备 (主流新手机)

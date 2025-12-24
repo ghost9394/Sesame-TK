@@ -15,6 +15,8 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.content.ContextCompat
@@ -25,6 +27,7 @@ import androidx.core.util.Consumer
 import androidx.lifecycle.lifecycleScope
 import fansirsqi.xposed.sesame.BuildConfig
 import fansirsqi.xposed.sesame.R
+import fansirsqi.xposed.sesame.SesameApplication.Companion.preferencesKey
 import fansirsqi.xposed.sesame.data.General
 import fansirsqi.xposed.sesame.data.RunType
 import fansirsqi.xposed.sesame.data.ServiceManager
@@ -79,7 +82,7 @@ class MainActivity : BaseActivity() {
             finish() // 如果权限未获取，终止当前 Activity
             return
         }
-        //clearLogsOnStart()
+        
         setContentView(R.layout.activity_main)
         oneWord = findViewById(R.id.one_word)
         val deviceInfo: ComposeView = findViewById(R.id.device_info)
@@ -88,8 +91,14 @@ class MainActivity : BaseActivity() {
             val customColorScheme = lightColorScheme(
                 primary = Color(0xFF3F51B5), onPrimary = Color.White, background = Color(0xFFF5F5F5), onBackground = Color.Black
             )
+            var deviceInfoData by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Map<String, String>?>(null) }
+            
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                deviceInfoData = DeviceInfoUtil.showInfo(verifyId, this@MainActivity)
+            }
+            
             MaterialTheme(colorScheme = customColorScheme) {
-                DeviceInfoCard(DeviceInfoUtil.showInfo(verifyId))
+                deviceInfoData?.let { DeviceInfoCard(it) }
             }
         }
         // 获取并设置一言句子
@@ -111,7 +120,7 @@ class MainActivity : BaseActivity() {
         }
 
         // 读取用户之前保存的设置
-        val prefs = getSharedPreferences("sesame_settings", MODE_PRIVATE)
+        val prefs = getSharedPreferences(preferencesKey, MODE_PRIVATE)
         // 默认为 false (不隐藏)
         val isHidden = prefs.getBoolean("is_icon_hidden", false)
         // 每次打开 App 都同步一次状态
@@ -318,26 +327,10 @@ class MainActivity : BaseActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             1 -> { // 隐藏应用图标
-//                val shouldHide = !item.isChecked
-//                item.isChecked = shouldHide
-//                val aliasComponent = ComponentName(this, General.MODULE_PACKAGE_UI_ICON)
-//                val newState = if (shouldHide) {
-//                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-//                } else {
-//                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-//                }
-//                packageManager.setComponentEnabledSetting(
-//                    aliasComponent,
-//                    newState,
-//                    PackageManager.DONT_KILL_APP
-//                )
-//                Toast.makeText(this, "设置已保存，可能需要重启桌面才能生效", Toast.LENGTH_SHORT).show()
-//                return true
-                // 这里是你的菜单点击事件逻辑
                 val shouldHide = !item.isChecked
                 item.isChecked = shouldHide
                 // 1. 保存用户的设置到 SP (建议操作，确保重启后状态正确)
-                val prefs = getSharedPreferences("sesame_settings", MODE_PRIVATE)
+                val prefs = getSharedPreferences(preferencesKey, MODE_PRIVATE)
                 prefs.edit { putBoolean("is_icon_hidden", shouldHide) }
                 // 2. 调用统一管理器应用更改
                 IconManager.syncIconState(this, shouldHide)

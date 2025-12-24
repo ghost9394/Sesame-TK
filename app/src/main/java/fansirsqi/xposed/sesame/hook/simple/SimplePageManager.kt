@@ -10,6 +10,10 @@ import android.util.Log
 import android.view.View
 import de.robv.android.xposed.XC_MethodHook
 import fansirsqi.xposed.sesame.hook.simple.xpcompat.CompatHelpers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 
@@ -37,7 +41,7 @@ object SimplePageManager {
     private var windowMonitorEnabled = false
     
     interface ActivityFocusHandler {
-        fun handleActivity(activity: Activity, root: SimpleViewImage): Boolean
+        suspend fun handleActivity(activity: Activity, root: SimpleViewImage): Boolean
     }
     
     init {
@@ -258,12 +262,13 @@ object SimplePageManager {
             return
         }
         
-        handler.postDelayed({
+        val job = CoroutineScope(Dispatchers.Main).launch {
+            delay(taskDuration.toLong())
             try {
                 Log.i(TAG, "triggerActivityActive activity: ${activity.javaClass.name} for ActivityFocusHandler: ${activityFocusHandler.javaClass.name}")
                 hasPendingActivityTask = false
                 if (activityFocusHandler.handleActivity(activity, SimpleViewImage(activity.window.decorView))) {
-                    return@postDelayed
+                    return@launch
                 }
             } catch (throwable: Throwable) {
                 Log.e(TAG, "error to handle activity: ${activity.javaClass.name}", throwable)
@@ -271,9 +276,9 @@ object SimplePageManager {
             
             if (triggerCount > 10) {
                 Log.w(TAG, "the activity event trigger failed too many times: ${activityFocusHandler.javaClass}")
-                return@postDelayed
+                return@launch
             }
             triggerActivityActive(activity, activityFocusHandler, triggerCount + 1)
-        }, taskDuration.toLong())
+        }
     }
 }

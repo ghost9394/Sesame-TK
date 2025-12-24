@@ -27,6 +27,10 @@ object WhackMole {
     /** 记录启动开始时间：用于精确计算已用时长，凑满6秒 */
     private val startTime = AtomicLong(0)
 
+    /** 运行状态标志：防止重复启动游戏 */
+    @Volatile
+    private var isRunning = false
+
     // ========== 数据类 ==========
     /**
      * 游戏会话：存储单局游戏的关键信息（新规则：只存储token）
@@ -54,13 +58,20 @@ object WhackMole {
     // ========== 自动入口 ==========
     /**
      * 启动打地鼠游戏的主入口
-     * 1. 从配置读取游戏局数
-     * 2. 串行启动所有局（带随机间隔）
-     * 3. 等待凑满10秒
-     * 4. 串行结算所有游戏局
+     * 1. 检查运行状态，防止重复启动
+     * 2. 从配置读取游戏局数
+     * 3. 串行启动所有局（带随机间隔）
+     * 4. 等待凑满10秒
+     * 5. 串行结算所有游戏局
      */
     @SuppressLint("DefaultLocale")
     fun startWhackMole() {
+        if (isRunning) {
+            Log.record(TAG, "⏭️ 打地鼠游戏正在运行中，跳过重复启动")
+            return
+        }
+        isRunning = true
+        
         // 在IO协程中执行，避免阻塞主线程
         globalScope.launch {
             try {
@@ -109,11 +120,15 @@ object WhackMole {
                     totalEnergy += settleBestRound(session)
                 }
                 // 最终日志：显示成功局数和总能量
+                Log.other("森林能量⚡️[打地鼠${sessions.size}局结算 总计${totalEnergy}g]")
                 Log.forest("森林能量⚡️[打地鼠${sessions.size}局结算 总计${totalEnergy}g]")
             } catch (_: CancellationException) {
                 Log.other( "打地鼠协程被取消")
             } catch (e: Exception) {
                 Log.other( "打地鼠异常: ${e.message}")
+            } finally {
+                isRunning = false
+                Log.record(TAG, "🎮 打地鼠游戏运行状态已重置")
             }
         }
     }
@@ -170,6 +185,10 @@ object WhackMole {
                 val total = resp.optInt("totalEnergy", 0)
                 val provide = resp.optInt("provideDefaultEnergy", 0)
                 Log.forest(
+                    "森林能量⚡️[第${session.roundNumber}局结算 " +
+                            "默认${provide}g 总计${total}g]"
+                )
+                Log.other(
                     "森林能量⚡️[第${session.roundNumber}局结算 " +
                             "默认${provide}g 总计${total}g]"
                 )

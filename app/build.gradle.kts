@@ -55,7 +55,7 @@ android {
         }
 
         versionCode = gitCommitCount
-        versionName = "0.4.4"
+        versionName = "0.5.0"
 
         buildConfigField("String", "BUILD_DATE", "\"$buildDate\"")
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
@@ -78,6 +78,7 @@ android {
         viewBinding = true
         buildConfig = true
         compose = true
+        aidl = true
     }
 
     compileOptions {
@@ -143,10 +144,10 @@ android {
 
 dependencies {
     // Shizuku 相关依赖 - 用于获取系统级权限
-    implementation(libs.rikka.shizuku.api)        // Shizuku API
-    implementation(libs.rikka.shizuku.provider)   // Shizuku 提供者
-    implementation(libs.rikka.refine)             // Rikka 反射工具
-    implementation(libs.ui.tooling.preview.android)
+    // implementation(libs.rikka.shizuku.api)        // Shizuku API
+    // implementation(libs.rikka.shizuku.provider)   // Shizuku 提供者
+    // implementation(libs.rikka.refine)             // Rikka 反射工具
+    // implementation(libs.ui.tooling.preview.android)
 
 
     // Compose 相关依赖 - 现代化 UI 框架

@@ -39,30 +39,33 @@ public class Files {
      */
     public static final File LOG_DIR = getLogDir();
 
+
     /**
      * 确保指定的目录存在且不是一个文件。
-     * 如果目录是一个文件，则将其删除并创建新的目录。
-     * 如果目录不存在，则创建该目录。
      *
-     * @param directory 要确保的目录对应的File对象。
+     * @param directory 目录
      */
     public static void ensureDir(File directory) {
         try {
             if (directory == null) {
-                Log.error(TAG, "Directory cannot be null");
+                // 🔥 修改点 1：使用原生 Log，避免依赖循环
+                android.util.Log.e(TAG, "Directory cannot be null");
                 return;
             }
             if (!directory.exists()) {
                 if (!directory.mkdirs()) {
-                    Log.error(TAG, "Failed to create directory: " + directory.getAbsolutePath());
+                    // 🔥 修改点 2：使用原生 Log
+                    android.util.Log.e(TAG, "Failed to create directory: " + directory.getAbsolutePath());
                 }
             } else if (directory.isFile()) {
                 if (!directory.delete() || !directory.mkdirs()) {
-                    Log.error(TAG, "Failed to replace file with directory: " + directory.getAbsolutePath());
+                    // 🔥 修改点 3：使用原生 Log
+                    android.util.Log.e(TAG, "Failed to replace file with directory: " + directory.getAbsolutePath());
                 }
             }
         } catch (Exception e) {
-            Log.printStackTrace(TAG + " ensureDir error", e);
+            // 🔥 修改点 4：使用原生 Log
+            android.util.Log.e(TAG, "ensureDir error", e);
         }
     }
 
@@ -170,7 +173,7 @@ public class Files {
         // 先确保用户目录存在
         File userDir = new File(CONFIG_DIR, userId);
         ensureDir(userDir);
-        
+
         File targetFile = new File(userDir, fullTargetFileName);
         // 如果文件不存在且不是目录，尝试创建
         if (!targetFile.exists()) {
@@ -206,7 +209,7 @@ public class Files {
     public static synchronized File getTargetFileofDir(File dir, String fullTargetFileName) {
         // 先确保目录存在
         ensureDir(dir);
-        
+
         // 创建目标文件对象
         File targetFile = new File(dir, fullTargetFileName);
 

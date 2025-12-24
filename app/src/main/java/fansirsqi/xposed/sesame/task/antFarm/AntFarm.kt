@@ -57,7 +57,7 @@ import java.util.Locale
 import java.util.Objects
 import java.util.Random
 import kotlin.math.min
-
+@Suppress("unused", "EnumEntryName", "EnumEntryName", "EnumEntryName", "EnumEntryName")
 class AntFarm : ModelTask() {
     private var ownerFarmId: String? = null
     private var animals: Array<Animal>? = null

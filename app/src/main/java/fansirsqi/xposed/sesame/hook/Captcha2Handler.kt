@@ -20,7 +20,7 @@ class Captcha2Handler : BaseCaptchaHandler(), SimplePageManager.ActivityFocusHan
      * 是否需要调试打印所有 TextView
      */
     override fun shouldDebugPrintTextViews(): Boolean {
-        return false
+        return true
     }
 
 }
