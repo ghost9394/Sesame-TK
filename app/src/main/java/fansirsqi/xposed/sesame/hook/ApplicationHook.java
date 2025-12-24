@@ -1,6 +1,5 @@
 package fansirsqi.xposed.sesame.hook;
 
-import com.zhenxi.Superappium.PageManager;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Application;
@@ -15,6 +14,7 @@ import androidx.annotation.NonNull;
 
 import fansirsqi.xposed.sesame.hook.keepalive.SmartSchedulerManager;
 import fansirsqi.xposed.sesame.hook.server.ModuleHttpServerManager;
+import fansirsqi.xposed.sesame.hook.simple.SimplePageManager;
 import kotlin.Unit;
 import lombok.Setter;
 
@@ -493,11 +493,13 @@ public class ApplicationHook {
         }
 
         // 初始化CaptchaHandler
-            PageManager.addHandler("com.alipay.mobile.nebulax.xriver.activity.XRiverActivity",
+            SimplePageManager.INSTANCE.addHandler(
+                    "com.alipay.mobile.nebulax.xriver.activity.XRiverActivity",
                     new Captcha1Handler());
 
-            PageManager.addHandler("com.eg.android.AlipayGphone.AlipayLogin",
-                new Captcha2Handler());
+            SimplePageManager.INSTANCE.addHandler(
+                    "com.eg.android.AlipayGphone.AlipayLogin",
+                    new Captcha2Handler());
 
 
 
@@ -522,6 +524,9 @@ public class ApplicationHook {
                     }
                     // SecurityBodyHelper初始化
                     SecurityBodyHelper.INSTANCE.init(classLoader);
+
+                    // 启用SimplePageManager窗口监控
+                    SimplePageManager.INSTANCE.enableWindowMonitoring(classLoader);
 
                     // ✅ 优先使用 Hook 捕获的版本号
                     if (VersionHook.hasVersion()) {
