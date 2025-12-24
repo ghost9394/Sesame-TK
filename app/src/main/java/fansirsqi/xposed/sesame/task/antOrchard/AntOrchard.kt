@@ -158,8 +158,6 @@ class AntOrchard : ModelTask() {
         }
     }
 
-
-
     private fun canSpreadManureContinue(stageBefore: Int, stageAfter: Int): Boolean {
         return if (stageAfter - stageBefore > 1) {
             true
@@ -240,8 +238,10 @@ class AntOrchard : ModelTask() {
                     }
 
                     val maxCanWater = minOf(remainingTarget, wateringLeftTimes)
-                    val useQuickWater = maxCanWater >= 5
-                    val actualWaterTimes = if (useQuickWater) minOf(5, maxCanWater) else 1
+
+                    //无需更改，一键施肥5次 只加100明日奖励，        施肥1次也加100，为了增加农场奖励，暂时不使用快速模式
+                    val useQuickWater = false                //maxCanWater >= 5
+                    val actualWaterTimes =1         // if (useQuickWater) minOf(5, maxCanWater) else 1
 
                     val wua = SecurityBodyHelper.getSecurityBodyData(4).toString()
                     val randomSource = sourceList.random()
@@ -431,14 +431,14 @@ class AntOrchard : ModelTask() {
                     for (cnt in 0 until timesToDo) {
                         val finishResponse = JSONObject(AntOrchardRpcCall.finishTask(userId, sceneCode, taskId))
                         if (ResChecker.checkRes(TAG,finishResponse)) {
-                            Log.farm( "农场广告任务📺[$title] 第${rightsTimes + cnt + 1}次")
+                            Log.farm("农场广告任务📺[$title] 第${rightsTimes + cnt + 1}次")
                         } else {
-                          //  Log.error(TAG, "失败：农场广告任务📺[$titlge] 第${rightsTimes + cnt + 1}次${finishResponse.optString("desc")}")
-                                // 自动添加到黑名单
-                                val errorCode = finishResponse.optString("code", "")
-                                if (!errorCode.isEmpty()) {
-                                    TaskBlacklist.autoAddToBlacklist(groupId, title, errorCode)
-                                }
+                            //  Log.error(TAG, "失败：农场广告任务📺[$titlge] 第${rightsTimes + cnt + 1}次${finishResponse.optString("desc")}")
+                            // 自动添加到黑名单
+                            val errorCode = finishResponse.optString("code", "")
+                            if (!errorCode.isEmpty()) {
+                                TaskBlacklist.autoAddToBlacklist(groupId, title, errorCode)
+                            }
                             break
                         }
                         CoroutineUtils.sleepCompat(executeIntervalInt.toLong())
@@ -497,7 +497,7 @@ class AntOrchard : ModelTask() {
                     val jackpot = smashedItem.optBoolean("jackpot", false)
 
                     // 输出信息
-                    Log.farm( "砸出肥料 🎖️: $manureCount g" + if (jackpot) "（触发大奖）" else "")
+                    Log.farm("砸出肥料 🎖️: $manureCount g" + if (jackpot) "（触发大奖）" else "")
                 }
 
                 /*
@@ -506,13 +506,12 @@ class AntOrchard : ModelTask() {
                  if (goldenEggInfo != null) {
                      val smashedGoldenEggs = goldenEggInfo.optInt("smashedGoldenEggs", 0)
                      val unsmashedGoldenEggs = goldenEggInfo.optInt("unsmashedGoldenEggs", 0)
-                     Log.farm( "已砸蛋: $smashedGoldenEggs, 剩余可砸蛋: $unsmashedGoldenEggs")
+                     Log.farm("已砸蛋: $smashedGoldenEggs, 剩余可砸蛋: $unsmashedGoldenEggs")
                  }
                  */
 
             } else {
                 Log.record(TAG, jo.optString("resultDesc", "未知错误"))
-                Log.runtime(TAG, response)
             }
 
         } catch (t: Throwable) {
@@ -542,15 +541,11 @@ class AntOrchard : ModelTask() {
                         Log.farm("领取奖励🎖️[$title]#${awardCount}g肥料")
                     } else {
                         Log.record(TAG,jo3.toString())
-                        Log.runtime(TAG,jo3.toString())
                     }
-
-
 
                 }
             } else {
                 Log.record(TAG,jo.getString("resultDesc"))
-                Log.runtime(TAG,response)
             }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG,"triggerTbTask err:", t)
@@ -584,7 +579,6 @@ class AntOrchard : ModelTask() {
                 val awardDesc = awardObj.optString("awardDesc", "")
 
                 Log.farm(
-                    TAG,
                     "回访奖励[$awardDesc] $awardCount g肥料"
                 )
 
@@ -594,7 +588,6 @@ class AntOrchard : ModelTask() {
             Log.printStackTrace(TAG, "receiveOrchardVisitAward err:", t)
         }
     }
-
 
     //限时奖励
     private fun limitedTimeChallenge() {
@@ -615,8 +608,6 @@ class AntOrchard : ModelTask() {
                 Log.error(TAG, "错误：limitedTimeChallenge 字段不存在或为 null")
                 return
             }
-
-
 
             val currentRound = challenge.optInt("currentRound", 0)
             if (currentRound <= 0) {
@@ -660,7 +651,7 @@ class AntOrchard : ModelTask() {
                 val joo = JSONObject(awardResp)
 
                 if (ResChecker.checkRes(TAG,joo)) {
-                    Log.farm( "第 $currentRound 轮 限时任务🎁[肥料 * $MawardCount]")
+                    Log.farm("第 $currentRound 轮 限时任务🎁[肥料 * $MawardCount]")
 
                 } else {
                     val desc = joo.optString("desc", "未知错误")
@@ -682,8 +673,6 @@ class AntOrchard : ModelTask() {
             }
 
             Log.record(TAG, "开始处理第 $currentRound 轮的 ${childTasks.length()} 个子任务")
-
-
 
             // 5. 遍历子任务
             for (i in 0 until childTasks.length()) {
@@ -784,7 +773,7 @@ class AntOrchard : ModelTask() {
                         // 容错处理：如果spaceCodeFeeds还是null，尝试从原始targetUrl直接提取
                         val finalSpaceCode = spaceCodeFeeds ?: UrlUtil.getParamValue(targetUrl, "spaceCodeFeeds") ?: ""
                         if (finalSpaceCode.isEmpty()) {
-                       //      Log.record(TAG, "spaceCodeFeeds 解析失败，跳过此任务")
+                            //      Log.record(TAG, "spaceCodeFeeds 解析失败，跳过此任务")
                             continue
                         }
 
@@ -902,7 +891,6 @@ class AntOrchard : ModelTask() {
                                     Log.farm("农场许愿✨[每日施肥$taskRequire 次]")
                                 } else {
                                     Log.record(TAG,jo5.getString("resultDesc"))
-                                    Log.runtime(TAG,jo5.toString())
                                 }
                             }
                         }
@@ -914,14 +902,12 @@ class AntOrchard : ModelTask() {
                                 return
                             } else {
                                 Log.record(TAG,jo3.getString("resultDesc"))
-                                Log.runtime(TAG,jo3.toString())
                             }
                         }
                     }
                 }
             } else {
                 Log.record(TAG,jo.getString("resultDesc"))
-                Log.runtime(TAG,response)
             }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "querySubplotsActivity err:",t)

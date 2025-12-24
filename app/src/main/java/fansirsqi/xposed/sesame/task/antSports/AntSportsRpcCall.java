@@ -299,15 +299,15 @@ public class AntSportsRpcCall {
                         + "}]");
     }
 
-    // 查询城市路线 (新版 API)
+
     public static String queryCityPath(String cityId) {
         return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.queryCityPath",
                 "[{"
                         + "\"apiVersion\":\"energy\","
-                        + "\"chInfo\":\"medical_health\","
+                        + "\"chInfo\":\"ch_othertinyapp\","
                         + "\"cityId\":\"" + cityId + "\","
                         + "\"clientOS\":\"android\","
-                        + "\"features\""+FEATURES
+                        + "\"features\":" + FEATURES
                         + "}]");
     }
     // 查询路线
@@ -328,15 +328,38 @@ public class AntSportsRpcCall {
     }
     // 加入路线
     public static String joinPath(String pathId) {
-        return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.joinPath",
-                "[{\"pathId\":\"" + pathId + "\",\"source\":\"ch_appcenter__chsub_9patch\"}]");
+        // 构造请求体
+        String requestBody = "[{"
+                + "\"apiVersion\":\"energy\","
+                + "\"chInfo\":\"ch_othertinyapp\","
+                + "\"clientOS\":\"android\","
+                + "\"features\":" + FEATURES + ","
+                + "\"pathId\":\"" + pathId + "\""
+                + "}]";
+
+        return RequestManager.requestString(
+                "com.alipay.sportsplay.biz.rpc.walk.joinPath",
+                requestBody
+        );
     }
     // 行走路线
-    public static String walkGo(String appId, String date, String pathId, int useStepCount) {
-        return RequestManager.requestString("com.alipay.sportsplay.biz.rpc.walk.go",
-                "[{\"appId\":\"" + appId + "\",\"date\":\"" + date + "\",\"pathId\":\"" + pathId
-                        + "\",\"source\":\"ch_appcenter__chsub_9patch\",\"timeZone\":\"" + timeZone
-                        + "\",\"useStepCount\":\"" + useStepCount + "\"}]");
+    public static String walkGo(String date, String pathId, int useStepCount) {
+        String requestBody = "[{"
+                + "\"apiVersion\":\"energy\","
+                + "\"chInfo\":\"ch_othertinyapp\","
+                + "\"clientOS\":\"android\","
+                + "\"date\":\"" + date + "\","
+                + "\"features\":" + FEATURES + ","
+                + "\"pathId\":\"" + pathId + "\","
+                + "\"source\":\"ch_othertinyapp\","
+                + "\"timeZone\":\"" + timeZone + "\","
+                + "\"useStepCount\":" + useStepCount
+                + "}]";
+
+        return RequestManager.requestString(
+                "com.alipay.sportsplay.biz.rpc.walk.go",
+                requestBody
+        );
     }
     // 开启宝箱
     // eventBillNo = boxNo(WalkGo)

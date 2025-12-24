@@ -14,7 +14,6 @@ import fansirsqi.xposed.sesame.util.maps.BeachMap
 import fansirsqi.xposed.sesame.util.maps.IdMapManager
 import lombok.Getter
 
-
 /**
  * 基础配置模块
  */
@@ -82,7 +81,6 @@ class BaseModel : Model() {
         return modelFields
     }
 
-
     interface TimedTaskModel {
         companion object {
             const val SYSTEM: Int = 0
@@ -104,7 +102,7 @@ class BaseModel : Model() {
          * //手动触发是否自动安排下次执行
          */
         @Getter
-        val manualTriggerAutoSchedule: BooleanModelField = BooleanModelField("manualTriggerAutoSchedule", "手动触发支付宝运行", false)
+        val manualTriggerAutoSchedule: BooleanModelField = BooleanModelField("manualTriggerAutoSchedule", "手动触发支付宝运行", false) //一般人不开这个
 
         /**
          * 执行间隔时间（分钟）
@@ -116,7 +114,7 @@ class BaseModel : Model() {
          * 任务执行轮数配置
          */
         @Getter
-        val taskExecutionRounds: IntegerModelField = IntegerModelField("taskExecutionRounds", "任务执行轮数", 2, 1, 99)
+        val taskExecutionRounds: IntegerModelField = IntegerModelField("taskExecutionRounds", "任务执行轮数", 1, 1, 99) //1轮就好，没必要2轮
 
         /**
          * 定时执行的时间点列表
@@ -127,7 +125,6 @@ class BaseModel : Model() {
                 "0010", "0030", "0100", "0700", "0730", "1200", "1230", "1700", "1730", "2000", "2030", "2359"
             )
         )
-
 
         /**
          * 定时唤醒的时间点列表
@@ -202,7 +199,6 @@ class BaseModel : Model() {
          */
         @Getter
         val enableCaptchaUIHook: BooleanModelField = BooleanModelField("enableCaptchaUIHook", "🛡️拒绝访问VPN弹窗拦截", false)
-
 
         /**
          * 是否记录record日志
