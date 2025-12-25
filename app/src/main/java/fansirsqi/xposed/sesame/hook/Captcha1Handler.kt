@@ -18,11 +18,5 @@ class Captcha1Handler : BaseCaptchaHandler(), SimplePageManager.ActivityFocusHan
         return "slide_path_Sheng_Huo"
     }
 
-    /**
-     * 是否需要调试打印所有 TextView
-     */
-    override fun shouldDebugPrintTextViews(): Boolean {
-        return true
-    }
 
 }

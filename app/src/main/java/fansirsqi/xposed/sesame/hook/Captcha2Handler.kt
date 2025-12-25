@@ -16,11 +16,4 @@ class Captcha2Handler : BaseCaptchaHandler(), SimplePageManager.ActivityFocusHan
         return "slide_path_API"
     }
 
-    /**
-     * 是否需要调试打印所有 TextView
-     */
-    override fun shouldDebugPrintTextViews(): Boolean {
-        return true
-    }
-
 }

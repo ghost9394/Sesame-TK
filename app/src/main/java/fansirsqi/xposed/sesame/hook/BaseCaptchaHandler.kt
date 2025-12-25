@@ -7,186 +7,224 @@ import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.util.GlobalThreadPools.sleepCompat
 import fansirsqi.xposed.sesame.util.Log
 import fansirsqi.xposed.sesame.util.SwipeUtil
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
 
 /**
- * 验证码处理器基类 - 提取公共逻辑
+ * 滑动路径数据类 - 封装滑动验证码的路径信息
+ * @property startX 滑动起始X坐标
+ * @property startY 滑动起始Y坐标
+ * @property endX 滑动结束X坐标
+ * @property endY 滑动结束Y坐标
+ */
+data class SlidePath(
+    val startX: Int,
+    val startY: Int,
+    val endX: Int,
+    val endY: Int
+) {
+    fun toIntArray(): IntArray = intArrayOf(startX, startY, endX, endY)
+}
+
+/**
+ * 验证码处理器基类 - 提供滑动验证码处理的公共逻辑
  * 处理支付宝验证码页面的滑动验证码
  */
 abstract class BaseCaptchaHandler {
 
     companion object {
         private const val TAG = "CaptchaHandler"
-        private const val DEFAULT_SLIDE_TIMEOUT = 5000L // 滑动操作超时时间5秒
-    }
+        
+        // 滑动起始位置偏移量（像素）
+        private const val SLIDE_START_OFFSET = 50
+        // 滑动结束位置距离屏幕右侧的边距（像素）
+        private const val SLIDE_END_MARGIN = 100
+        // 滑动持续时间（毫秒）
+        private const val SLIDE_DURATION = 500L
+        // 最大滑动重试次数
+        private const val MAX_SLIDE_RETRIES = 3
+        // 滑动重试间隔时间（毫秒）
+        private const val SLIDE_RETRY_INTERVAL = 500L
 
-    // 滑动状态锁：防止重复滑动
-    private val isSliding = AtomicBoolean(false)
-    
-    // 记录上次滑动开始时间，用于超时判断
-    private val lastSlideStartTime = AtomicLong(0)
+    }
 
     /**
      * 获取滑动路径在 DataStore 中的存储 key
+     * @return 存储滑动路径的 key
      */
     protected abstract fun getSlidePathKey(): String
 
-    /**
-     * 是否需要调试打印所有 TextView
-     */
-    protected open fun shouldDebugPrintTextViews(): Boolean = false
 
     /**
      * 处理 Activity 中的验证码
+     * @param activity 当前 Activity 实例
+     * @param root 根视图
+     * @return true 表示验证码处理成功，false 表示处理失败
      */
     open suspend fun handleActivity(activity: Activity, root: SimpleViewImage): Boolean {
         try {
-            Log.debug(TAG, "Activity: ${activity.javaClass.name}")
-            Log.debug(TAG, "Root View: ${root.getType()}")
-            
-            // 检查是否正在滑动中
-            if (isSliding.get()) {
-                val elapsed = System.currentTimeMillis() - lastSlideStartTime.get()
-                // 如果滑动超过5秒还没完成，认为可能卡住了，允许重试
-                if (elapsed < DEFAULT_SLIDE_TIMEOUT) {
-                    Log.captcha(TAG, "当前正在滑动中，跳过本次调用 (已耗时: ${elapsed}ms)")
-                    return false
-                } else {
-                    Log.captcha(TAG, "滑动操作超时(${elapsed}ms)，强制重置状态")
-                    isSliding.set(false)
-                }
-            }
-            
             if (handleSlideCaptcha(activity, root)) {
                 return true
             }
-
         } catch (e: Exception) {
-           Log.error(TAG, "处理验证码页面时发生异常: ${e.message}")
+            Log.error(TAG, "处理验证码页面时发生异常: ${e.message}")
         }
-
         return false
     }
 
     @SuppressLint("SuspiciousIndentation")
     private suspend fun handleSlideCaptcha(activity: Activity, root: SimpleViewImage): Boolean {
-        // 尝试获取滑动锁
-        if (!isSliding.compareAndSet(false, true)) {
-            Log.captcha(TAG, "无法获取滑动锁，另一个滑动正在进行中")
-            return false
-        }
-        
-        // 记录滑动开始时间
-        lastSlideStartTime.set(System.currentTimeMillis())
-        
         return try {
-           Log.captcha(TAG, "========== 开始处理滑动验证码 ==========")
-           
-           // 调试：打印所有TextView的文本内容
-           if (shouldDebugPrintTextViews()) {
-               debugPrintAllTextViews(root, 0)
-           }
-           
-           // 查找"向右滑动验证"文字
-           val slideText = root.xpath2One("//TextView[contains(@text,'向右滑动验证')]")
-       
-           Log.captcha(TAG, "查找结果:")
-           Log.captcha(TAG, "  向右滑动验证(text): ${if (slideText != null) "找到" else "未找到"}")
+            Log.captcha(TAG, "========== 开始处理滑动验证码 ==========")
 
-           if (slideText == null) {
+
+            val slideText = findSlideText(root) ?: run {
                 Log.captcha(TAG, "未找到任何滑动验证相关文字")
-                // 没有验证码，立即释放锁
                 return false
             }
-                
             Log.captcha(TAG, "发现滑动验证文字: ${slideText.getText()}")
-            // 获取父节点位置信息
-            val slideTextParent = slideText.parentNode(1)
-            if (slideTextParent == null) {
+            
+            val slideRect = getSlideRect(slideText) ?: run {
                 Log.captcha(TAG, "未找到父节点")
                 return false
             }
-            val slideRect = slideTextParent.locationOnScreen()
-             Log.captcha(TAG, "滑动区域位置: ${slideRect.contentToString()}")
-                // 获取当前屏幕信息
-                val displayMetrics = activity.resources.displayMetrics
-                val screenWidth = displayMetrics.widthPixels
-                val screenHeight = displayMetrics.heightPixels
-                Log.captcha(TAG, "屏幕尺寸: ${screenWidth}x$screenHeight")
-                
-                // 重新计算滑动路径
-                val startX = slideRect[0] + 50  // 左边偏移50像素
-                val centerY = slideRect[1] + 50  // 使用已知Y坐标
-                // 滑动到屏幕最右边
-                val endX = screenWidth - 100  // 滑动到屏幕右边，留50像素边界
-                Log.captcha(TAG, "重新计算的滑动路径: ($startX, $centerY) -> ($endX, $centerY)")
 
-                // 构建滑动路径数组
-                // 将滑动路径存储到DataStore（只在路径变化时保存）
-                try {
-                    val slidePath = intArrayOf(startX, centerY, endX, centerY)
-                    val slidePathKey = getSlidePathKey()
-                    val existingPath = DataStore.get(slidePathKey, IntArray::class.java)
-                    
-                    // 只有路径发生变化时才保存
-                    if (existingPath == null || !existingPath.contentEquals(slidePath)) {
-                        DataStore.put(slidePathKey, slidePath)
-                        Log.captcha(TAG, "滑动路径已保存到DataStore: [${slidePath.joinToString(", ")}]")
-                    }
-                    Log.captcha(TAG, "路径数据: [${slidePath.joinToString(", ")}]")
-                    
-                    // 执行滑动操作
-                    Log.captcha(TAG, "正在执行滑动操作...")
-                    val swipeSuccess = SwipeUtil.swipe(activity, startX, centerY, endX, centerY, 1000)
-                    
-                    if (swipeSuccess) {
-                        Log.captcha(TAG, "滑动操作执行成功，等待验证结果...")
-                        
-                        // 滑动成功后，等待一段时间，观察是否验证码消失
-                        sleepCompat(2000)
-                        
-                        // 再次检查是否还存在滑动验证文字
-                        val checkAgain = root.xpath2One("//TextView[contains(@text,'向右滑动验证')]")
-                        if (checkAgain != null) {
-                            Log.captcha(TAG, "滑动后验证码仍存在，可能验证失败，准备重试")
-                            return false // 保持锁状态，让上层决定是否重试
-                        } else {
-                            Log.captcha(TAG, "滑动后验证码已消失，验证成功")
-                            return true
-                        }
-                    } else {
-                        Log.captcha(TAG, "滑动操作执行失败")
-                        return false
-                    }
-                    
-                } catch (e: Exception) {
-                    Log.captcha(TAG, "保存滑动路径到DataStore失败: ${e.message}")
-                    return false
-                }
-
-        } catch (e: Exception) {
-            Log.captcha(TAG, "处理滑动验证码时发生异常: ${e.message}")
-            return false
-        } finally {
-            // 无论成功失败，都要在finally中释放锁
-            isSliding.set(false)
-            Log.captcha(TAG, "滑动锁已释放")
+            val slidePath = calculateSlidePath(activity, slideRect)
+            logSlideInfo(activity, slideRect, slidePath)
+            
+            saveSlidePathIfNeeded(slidePath)
+            
+            executeSlideWithRetry(activity, root, slidePath)
+        } catch (_: Exception) {
+          //  Log.captcha(TAG, "处理滑动验证码时发生异常: ${e.message}")
+            false
         }
     }
-    
+
     /**
-     * 调试：打印所有TextView的文本内容
+     * 查找滑动验证文本
+     * @param root 根视图
+     * @return 找到的滑动文本视图，未找到返回 null
      */
-    private fun debugPrintAllTextViews(view: SimpleViewImage, depth: Int) {
-        val indent = "  ".repeat(depth)
-        val text = view.getText()
-        if (text != null && text.isNotEmpty()) {
-            Log.captcha(TAG, "${indent}[${view.getType()}] text=$text")
-        }
-        for (child in view.children()) {
-            debugPrintAllTextViews(child, depth + 1)
+    private fun findSlideText(root: SimpleViewImage): SimpleViewImage? {
+        return root.xpath2One("//TextView[contains(@text,'向右滑动验证')]")
+    }
+
+    /**
+     * 获取滑动区域的位置信息
+     * @param slideText 滑动文本视图
+     * @return 滑动区域的位置数组，获取失败返回 null
+     */
+    private fun getSlideRect(slideText: SimpleViewImage): IntArray? {
+        val slideTextParent = slideText.parentNode(1) ?: return null
+        return slideTextParent.locationOnScreen()
+    }
+
+    /**
+     * 计算滑动路径
+     * @param activity 当前 Activity
+     * @param slideRect 滑动区域位置
+     * @return 计算得到的滑动路径
+     */
+    private fun calculateSlidePath(activity: Activity, slideRect: IntArray): SlidePath {
+        val displayMetrics = activity.resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        
+        val startX = slideRect[0] + SLIDE_START_OFFSET
+        val centerY = slideRect[1] + SLIDE_START_OFFSET
+        val endX = screenWidth - SLIDE_END_MARGIN
+        
+        return SlidePath(startX, centerY, endX, centerY)
+    }
+
+    /**
+     * 记录滑动信息到日志
+     * @param activity 当前 Activity
+     * @param slideRect 滑动区域位置
+     * @param slidePath 滑动路径
+     */
+    private fun logSlideInfo(activity: Activity, slideRect: IntArray, slidePath: SlidePath) {
+        val displayMetrics = activity.resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+        Log.captcha(TAG, "滑动区域位置: ${slideRect.contentToString()}")
+        Log.captcha(TAG, "屏幕尺寸: ${screenWidth}x$screenHeight")
+        Log.captcha(TAG, "滑动路径: (${slidePath.startX}, ${slidePath.startY}) -> (${slidePath.endX}, ${slidePath.endY})")
+    }
+
+    /**
+     * 保存滑动路径到 DataStore（仅在路径变化时保存）
+     * @param slidePath 要保存的滑动路径
+     */
+    private fun saveSlidePathIfNeeded(slidePath: SlidePath) {
+        try {
+            val slidePathArray = slidePath.toIntArray()
+            val slidePathKey = getSlidePathKey()
+            val existingPath = DataStore.get(slidePathKey, IntArray::class.java)
+
+            if (existingPath == null || !existingPath.contentEquals(slidePathArray)) {
+                DataStore.put(slidePathKey, slidePathArray)
+                Log.captcha(TAG, "滑动路径已保存到DataStore: [${slidePathArray.joinToString(", ")}]")
+            }
+            Log.captcha(TAG, "路径数据: [${slidePathArray.joinToString(", ")}]")
+        } catch (e: Exception) {
+            Log.captcha(TAG, "保存滑动路径到DataStore失败: ${e.message}")
         }
     }
+
+    /**
+     * 执行滑动操作并重试
+     * @param activity 当前 Activity
+     * @param root 根视图
+     * @param slidePath 滑动路径
+     * @return true 表示滑动成功，false 表示滑动失败
+     */
+    private suspend fun executeSlideWithRetry(activity: Activity, root: SimpleViewImage, slidePath: SlidePath): Boolean {
+        repeat(MAX_SLIDE_RETRIES) { retry ->
+            Log.captcha(TAG, "========== 第 ${retry + 1} 次尝试滑动 ==========")
+            val swipeSuccess = SwipeUtil.swipe(
+                activity,
+                slidePath.startX,
+                slidePath.startY,
+                slidePath.endX,
+                slidePath.endY,
+                SLIDE_DURATION
+            )
+            if (swipeSuccess) {
+                Log.captcha(TAG, "滑动操作执行成功，等待验证码文本消失...")
+                sleepCompat(1500)
+                Log.captcha(TAG, "开始检测验证码文本...")
+                if (checkCaptchaTextGone(root)) {
+                    Log.captcha(TAG, "验证码文本已消失，滑动成功")
+                    return true
+                } else {
+                    Log.captcha(TAG, "验证码文本仍然存在，准备重试...")
+                }
+            } else {
+                Log.captcha(TAG, "滑动操作执行失败，准备重试...")
+            }
+            
+            if (retry < MAX_SLIDE_RETRIES - 1) {
+                sleepCompat(SLIDE_RETRY_INTERVAL)
+            }
+        }
+        
+        Log.captcha(TAG, "已重试 $MAX_SLIDE_RETRIES 次，验证码文本仍然存在")
+        return false
+    }
+
+    /**
+     * 检测验证码文本是否消失
+     * @param root 根视图
+     * @return true 表示文本已消失，false 表示文本仍然存在
+     */
+    private fun checkCaptchaTextGone(root: SimpleViewImage): Boolean {
+        return if (findSlideText(root) == null) {
+            Log.captcha(TAG, "验证码文本已消失")
+            true
+        } else {
+            Log.captcha(TAG, "验证码文本仍然存在")
+            false
+        }
+    }
+
 
 }

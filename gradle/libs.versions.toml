@@ -7,7 +7,7 @@ constraintlayout = "2.2.1"
 
 fastjson = "2.0.60"
 hiddenapibypass = "6.1"
-kotlin = "2.2.21"
+kotlin = "2.3.0"
 kotlinxCoroutinesCore = "1.10.2"
 kotlinxSerializationJson = "1.9.0"
 lifecycleLivedataKtx = "2.10.0"

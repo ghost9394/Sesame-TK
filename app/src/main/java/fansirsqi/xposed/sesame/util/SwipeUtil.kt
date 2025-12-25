@@ -14,6 +14,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import androidx.core.net.toUri
 
 /**
  * 滑动操作工具类
@@ -285,38 +286,19 @@ object SwipeUtil {
         }
     }
 
-    /**
-     * 通过 Scheme 启动应用（使用协程，无需 root）
-     * @param context 上下文
-     * @param scheme URL Scheme（如 alipays://platformapi/startapp?appId=xxx）
-     * @return 是否成功执行
-     */
-    suspend fun startByScheme(context: Context, scheme: String): Boolean = withContext(Dispatchers.IO) {
-        try {
-            Log.d(TAG, "通过 Scheme 启动: $scheme")
 
-            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(scheme))
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
-            Log.d(TAG, "Scheme 启动成功")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Scheme 启动失败: ${e.message}")
-            false
-        }
-    }
 
     /**
      * 通过 Scheme 启动应用（非协程版本，供 Java 调用，无需 root）
      * @param context 上下文
-     * @param scheme URL Scheme（如 alipays://platformapi/startapp?appId=xxx）
+     * @param android.R.attr.scheme URL Scheme（如 alipays://platformapi/startapp?appId=xxx）
      * @return 是否成功执行
      */
     @JvmStatic
-    fun startBySchemeSync(context: Context, scheme: String): Boolean {
+    fun startBySchemeSync(context: Context): Boolean {
         return try {
-            Log.d(TAG, "通过 Scheme 启动（同步版本）: $scheme")
-            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(scheme))
+
+            val intent = Intent(Intent.ACTION_VIEW, "alipays://platformapi/startapp?appId=".toUri())
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
             Log.d(TAG, "Scheme 启动成功")

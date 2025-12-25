@@ -1,5 +1,6 @@
 package fansirsqi.xposed.sesame.task.antMember
 
+import android.annotation.SuppressLint
 import fansirsqi.xposed.sesame.data.StatusFlags
 import fansirsqi.xposed.sesame.newutil.TaskBlacklist.autoAddToBlacklist
 import fansirsqi.xposed.sesame.newutil.TaskBlacklist.isTaskInBlacklist
@@ -90,7 +91,7 @@ object Credit2101 {
      * benefitId → 藏品卡片，展示名称
      */
     private fun getBenefitName(benefitId: String): String {
-        val id = benefitId  ?.toIntOrNull() ?: return "无法转换类型x未知奖励($benefitId)"
+        val id = benefitId.toIntOrNull() ?: return "无法转换类型x未知奖励($benefitId)"
         return when (id) {
             100021 -> "路引文书(蓝)"
             100043 -> "驷马难追(紫)"
@@ -178,6 +179,7 @@ object Credit2101 {
         }
     }
 
+    @SuppressLint("DefaultLocale")
     @JvmStatic
     fun doCredit2101() {
         try {
@@ -356,8 +358,8 @@ object Credit2101 {
                 exploreStamina = exploreStaminaVO?.optInt("staminaAvailable", 0) ?: 0,
                 energyStamina = energyStaminaVO?.optInt("staminaAvailable", 0) ?: 0,
                 lotteryNo = jo.optInt("lotteryNo", 0),
-                cityCode = accountVO?.optString("cityCode", null),
-                cityName = accountVO?.optString("cityName", null)
+                cityCode = accountVO?.optString("cityCode", "null"),
+                cityName = accountVO?.optString("cityName", "null")
             )
         }.getOrElse {
             Log.printStackTrace(TAG, it)
@@ -604,18 +606,18 @@ object Credit2101 {
 
                 // 3) RUNNING → 且 "taskConfigId": "GAME_SHARE", 说明是分享任务，第二次执行到这里就能自动领取了
                 if(taskStatus == "RUNNING" && taskConfigId=="GAME_SHARE"){
-                    val PUSHResp = Credit2101RpcCall.operateTask("TASK_PUSH", taskConfigId) //注意这里是Push
-                    if (PUSHResp.isEmpty()) {
+                    val pUSHResp = Credit2101RpcCall.operateTask("TASK_PUSH", taskConfigId) //注意这里是Push
+                    if (pUSHResp.isEmpty()) {
                         Log.error(TAG, "信用2101📋[分享任务失败] $taskName 返回为空")
                     } else {
-                        val cJo = JSONObject(PUSHResp)
+                        val cJo = JSONObject(pUSHResp)
                         val ok = ResChecker.checkRes(TAG, cJo) &&
                                 cJo.optBoolean("operateSuccess", true)
                         if (ok) {
                             claimCount++
                             Log.other( "信用2101📋[分享任务完成] $taskName ($taskConfigId)")
                         } else {
-                            Log.error(TAG, "信用2101📋[分享任务失败] $taskName resp=$PUSHResp")
+                            Log.error(TAG, "信用2101📋[分享任务失败] $taskName resp=$pUSHResp")
                         }
                     }
                     continue
@@ -752,10 +754,10 @@ object Credit2101 {
                 val qqJson = httpGetJson("https://api.qqsuu.cn/api/dm-ipquery?ip=$ip")
                 if (qqJson != null && qqJson.optInt("code", -1) == 200) {
                     val data = qqJson.optJSONObject("data")
-                    cityCode = data?.optString("areacode", null)
+                    cityCode = data?.optString("areacode", "")
 
-                    val latStr = data?.optString("latitude", null)
-                    val lngStr = data?.optString("longitude", null)
+                    val latStr = data?.optString("latitude", "")
+                    val lngStr = data?.optString("longitude", "")
                     val lat2 = latStr?.toDoubleOrNull()
                     val lng2 = lngStr?.toDoubleOrNull()
 
@@ -774,7 +776,7 @@ object Credit2101 {
                 Log.error(TAG, "信用2101📍[定位失败] cityCode/lat/lng 缺失 cityCode=$cityCode lat=$lat lng=$lng")
                 null
             } else {
-                LocationInfo(cityCode!!, lat, lng)
+                LocationInfo(cityCode, lat, lng)
             }
         }.getOrElse {
             Log.printStackTrace(TAG, it)
@@ -1047,7 +1049,7 @@ object Credit2101 {
 
             // 获取奖励数量，用于 extParams
             val collectedYJ = award.optString("awardAmount", "0")
-            val collectedYJInt = try { collectedYJ.toInt() } catch (e: Exception) { 0 }
+            val collectedYJInt = try { collectedYJ.toInt() } catch (_: Exception) { 0 }
 
             // 构造 extParams
             val extParams = JSONObject().apply {

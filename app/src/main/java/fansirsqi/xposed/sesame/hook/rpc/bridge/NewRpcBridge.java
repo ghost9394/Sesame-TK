@@ -291,11 +291,12 @@ public class NewRpcBridge implements RpcBridge {
 
                         // 检测安全验证错误，自动启动支付宝
                         if (errorMessage != null && errorMessage.contains("为了保障您的操作安全，请进行验证后继续")) {
-                            Log.error(TAG, "检测到安全验证错误，自动启动支付宝进行滑块中...");
+                           // Log.error(TAG, "检测到安全验证错误，自动启动支付宝进行滑块中...");
                             Toast.INSTANCE.show(
                                     "检测到安全验证错误，自动启动支付宝进行滑块中..."
                             );
-                            SwipeUtil.startAlipaySync(ApplicationHook.getAppContext());
+                            SwipeUtil.startBySchemeSync(ApplicationHook.getAppContext());
+                            return null;
                         }
 
                         if (errorMark.contains(errorCode) || errorStringMark.contains(errorMessage)) {
