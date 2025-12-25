@@ -12,6 +12,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.BufferedReader
 
 /**
@@ -26,40 +30,60 @@ class CommandService : Service() {
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
+    private val commandMutex = Mutex()
 
     private val binder = object : ICommandService.Stub() {
         override fun executeCommand(command: String, callback: ICallback?) {
             Log.d(TAG, "收到命令执行请求: $command")
             serviceScope.launch {
-                try {
-                    val process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
-                    val reader = BufferedReader(process.inputStream.reader())
-                    val errorReader = BufferedReader(process.errorStream.reader())
-
-                    val output = StringBuilder()
-                    val error = StringBuilder()
-
-                    var line: String?
-                    while (reader.readLine().also { line = it } != null) {
-                        output.append(line).append("\n")
+                commandMutex.withLock {
+                    Log.d(TAG, "开始执行命令: $command")
+                    var process: Process? = null
+                    try {
+                        process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
+                        
+                        val output = StringBuilder()
+                        val error = StringBuilder()
+                        
+                        val outputJob = launch {
+                            process?.inputStream?.bufferedReader()?.use { reader ->
+                                reader.forEachLine { line ->
+                                    output.append(line).append("\n")
+                                }
+                            }
+                        }
+                        
+                        val errorJob = launch {
+                            process?.errorStream?.bufferedReader()?.use { reader ->
+                                reader.forEachLine { line ->
+                                    error.append(line).append("\n")
+                                }
+                            }
+                        }
+                        
+                        outputJob.join()
+                        errorJob.join()
+                        
+                        val exitCode = process?.waitFor() ?: -1
+                        
+                        if (exitCode == 0) {
+                            Log.d(TAG, "命令执行成功: $command")
+                            callback?.onSuccess(output.toString())
+                        } else {
+                            Log.e(TAG, "命令执行失败: $command, 退出码: $exitCode, 错误: $error")
+                            callback?.onError("退出码: $exitCode, 错误: $error")
+                        }
+                    } catch (e: TimeoutCancellationException) {
+                        Log.e(TAG, "命令执行超时: $command")
+                        process?.destroy()
+                        callback?.onError("命令执行超时")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "执行命令异常: $command, 错误: ${e.message}")
+                        callback?.onError(e.message ?: "未知错误")
+                    } finally {
+                        process?.destroy()
+                        Log.d(TAG, "命令执行完成: $command")
                     }
-
-                    while (errorReader.readLine().also { line = it } != null) {
-                        error.append(line).append("\n")
-                    }
-
-                    val exitCode = process.waitFor()
-
-                    if (exitCode == 0) {
-                        Log.d(TAG, "命令执行成功: $command")
-                        callback?.onSuccess(output.toString())
-                    } else {
-                        Log.e(TAG, "命令执行失败: $command, 退出码: $exitCode, 错误: $error")
-                        callback?.onError("退出码: $exitCode, 错误: $error")
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "执行命令异常: $command, 错误: ${e.message}")
-                    callback?.onError(e.message ?: "未知错误")
                 }
             }
         }

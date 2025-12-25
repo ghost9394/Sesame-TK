@@ -492,17 +492,6 @@ public class ApplicationHook {
             Log.printStackTrace(TAG, "验证码Hook初始化失败", t);
         }
 
-        // 初始化CaptchaHandler
-            SimplePageManager.INSTANCE.addHandler(
-                    "com.alipay.mobile.nebulax.xriver.activity.XRiverActivity",
-                    new Captcha1Handler());
-
-            SimplePageManager.INSTANCE.addHandler(
-                    "com.eg.android.AlipayGphone.AlipayLogin",
-                    new Captcha2Handler());
-
-
-
 
         try {
             // 在Hook Application.attach 之前，先 deoptimize LoadedApk.makeApplicationInner
@@ -522,11 +511,10 @@ public class ApplicationHook {
                     if (General.PACKAGE_NAME.equals(finalProcessName) || (finalProcessName != null && finalProcessName.endsWith(":widgetProvider"))) {
                         registerBroadcastReceiver(appContext);
                     }
+
                     // SecurityBodyHelper初始化
                     SecurityBodyHelper.INSTANCE.init(classLoader);
 
-                    // 启用SimplePageManager窗口监控
-                    SimplePageManager.INSTANCE.enableWindowMonitoring(classLoader);
 
                     // ✅ 优先使用 Hook 捕获的版本号
                     if (VersionHook.hasVersion()) {
@@ -560,6 +548,24 @@ public class ApplicationHook {
                         HookUtil.INSTANCE.fuckAccounLimit(classLoader);
                         Log.runtime(TAG, "✅ 已对版本 10.7.26.8100 进行特殊处理");
                     }
+
+                    if (VersionHook.hasVersion() && "10.6.58.8000".equals(alipayVersion.getVersionString())) {
+                        // 启用SimplePageManager窗口监控
+                        SimplePageManager.INSTANCE.enableWindowMonitoring(classLoader);
+
+
+                        // 初始化CaptchaHandler
+                        Log.runtime(TAG, "✅ 开始初始化Captcha1Handler");
+                        SimplePageManager.INSTANCE.addHandler(
+                                "com.alipay.mobile.nebulax.xriver.activity.XRiverActivity",
+                                new Captcha1Handler());
+                        SimplePageManager.INSTANCE.addHandler(
+                                "com.eg.android.AlipayGphone.AlipayLogin",
+                                new Captcha2Handler());
+                    }else {
+                        Log.debug(TAG, "当前支付宝版本不是10.6.58.8000，不支自动滑块Hook");
+                    }
+
 
                     if (BuildConfig.DEBUG) {
                         try {

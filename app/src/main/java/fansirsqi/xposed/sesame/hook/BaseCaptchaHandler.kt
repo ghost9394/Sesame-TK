@@ -2,11 +2,15 @@ package fansirsqi.xposed.sesame.hook
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context
+import fansirsqi.xposed.sesame.hook.simple.SimplePageManager
 import fansirsqi.xposed.sesame.hook.simple.SimpleViewImage
 import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.util.GlobalThreadPools.sleepCompat
 import fansirsqi.xposed.sesame.util.Log
 import fansirsqi.xposed.sesame.util.SwipeUtil
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 滑动路径数据类 - 封装滑动验证码的路径信息
@@ -40,7 +44,7 @@ abstract class BaseCaptchaHandler {
         // 滑动持续时间（毫秒）
         private const val SLIDE_DURATION = 500L
         // 最大滑动重试次数
-        private const val MAX_SLIDE_RETRIES = 3
+        private const val MAX_SLIDE_RETRIES = 4
         // 滑动重试间隔时间（毫秒）
         private const val SLIDE_RETRY_INTERVAL = 500L
 
@@ -70,19 +74,20 @@ abstract class BaseCaptchaHandler {
         return false
     }
 
+
     @SuppressLint("SuspiciousIndentation")
     private suspend fun handleSlideCaptcha(activity: Activity, root: SimpleViewImage): Boolean {
         return try {
             Log.captcha(TAG, "========== 开始处理滑动验证码 ==========")
-
-
-            val slideText = findSlideText(root) ?: run {
-                Log.captcha(TAG, "未找到任何滑动验证相关文字")
+            
+            val slideTextInDialog = findSlideTextInDialog()
+            if (slideTextInDialog == null) {
+                Log.captcha(TAG, "Dialog 中未找到滑动验证文字，跳过处理")
                 return false
             }
-            Log.captcha(TAG, "发现滑动验证文字: ${slideText.getText()}")
+            Log.captcha(TAG, "发现滑动验证文字: ${slideTextInDialog.getText()}")
             
-            val slideRect = getSlideRect(slideText) ?: run {
+            val slideRect = getSlideRect(slideTextInDialog) ?: run {
                 Log.captcha(TAG, "未找到父节点")
                 return false
             }
@@ -90,22 +95,17 @@ abstract class BaseCaptchaHandler {
             val slidePath = calculateSlidePath(activity, slideRect)
             logSlideInfo(activity, slideRect, slidePath)
             
-            saveSlidePathIfNeeded(slidePath)
-            
+            val hasRootPermission = checkRootPermission(activity)
+            if (hasRootPermission) {
+                saveSlidePathIfNeeded(slidePath)
+            } else {
+                Log.captcha(TAG, "无 Root 权限，跳过保存滑动路径")
+            }
             executeSlideWithRetry(activity, root, slidePath)
         } catch (_: Exception) {
           //  Log.captcha(TAG, "处理滑动验证码时发生异常: ${e.message}")
             false
         }
-    }
-
-    /**
-     * 查找滑动验证文本
-     * @param root 根视图
-     * @return 找到的滑动文本视图，未找到返回 null
-     */
-    private fun findSlideText(root: SimpleViewImage): SimpleViewImage? {
-        return root.xpath2One("//TextView[contains(@text,'向右滑动验证')]")
     }
 
     /**
@@ -217,14 +217,47 @@ abstract class BaseCaptchaHandler {
      * @return true 表示文本已消失，false 表示文本仍然存在
      */
     private fun checkCaptchaTextGone(root: SimpleViewImage): Boolean {
-        return if (findSlideText(root) == null) {
-            Log.captcha(TAG, "验证码文本已消失")
-            true
-        } else {
-            Log.captcha(TAG, "验证码文本仍然存在")
-            false
+        val slideTextInDialog = findSlideTextInDialog()
+        if (slideTextInDialog == null) {
+            Log.captcha(TAG, "验证码文本已消失（Dialog 中未找到）")
+            return true
+        }
+        Log.captcha(TAG, "验证码文本仍然存在（在 Dialog 中找到）")
+        return false
+    }
+
+    /**
+     * 在 Dialog 中查找滑动验证文本
+     * @return 找到的滑动文本视图，未找到返回 null
+     */
+    private fun findSlideTextInDialog(): SimpleViewImage? {
+        return try {
+            SimplePageManager.tryGetTopView("//TextView[contains(@text,'向右滑动验证')]")
+        } catch (e: Exception) {
+            Log.captcha(TAG, "在 Dialog 中查找验证码文本失败: ${e.message}")
+            null
         }
     }
 
+    /**
+     * 检测 Root 权限
+     * @param context 上下文
+     * @return 是否有 Root 权限
+     */
+    private suspend fun checkRootPermission(context: Context): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val output = SwipeUtil.execRootCommandWithOutput(context, "id")
+            val hasRoot = output.contains("uid=0")
+            if (hasRoot) {
+                Log.captcha(TAG, "Root 权限检测成功")
+            } else {
+                Log.captcha(TAG, "Root 权限检测失败，输出: $output")
+            }
+            hasRoot
+        } catch (e: Exception) {
+            Log.captcha(TAG, "Root 权限检测异常: ${e.message}")
+            false
+        }
+    }
 
 }

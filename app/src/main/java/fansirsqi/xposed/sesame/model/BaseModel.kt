@@ -200,6 +200,7 @@ class BaseModel : Model() {
         @Getter
         val enableCaptchaUIHook: BooleanModelField = BooleanModelField("enableCaptchaUIHook", "🛡️拒绝访问VPN弹窗拦截", false)
 
+
         /**
          * 是否记录record日志
          */

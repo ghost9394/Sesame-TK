@@ -4,7 +4,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.net.Uri
 import android.os.IBinder
 import android.os.RemoteException
 import android.util.Log
@@ -133,6 +132,52 @@ object SwipeUtil {
     }
 
     /**
+     * 执行 Root 命令并返回输出结果（通过 AIDL）
+     * @param context 上下文
+     * @param command 要执行的命令
+     * @return 命令执行结果
+     */
+    suspend fun execRootCommandWithOutput(context: Context, command: String): String = withContext(Dispatchers.IO) {
+        if (!bindService(context)) {
+            Log.e(TAG, "无法绑定 CommandService")
+            return@withContext ""
+        }
+
+        val service = commandService
+        if (service == null) {
+            Log.e(TAG, "CommandService 未连接")
+            return@withContext ""
+        }
+
+        val deferred = CompletableDeferred<String>()
+
+        val callback = object : ICallback.Stub() {
+            override fun onSuccess(output: String) {
+                Log.d(TAG, "命令执行成功: $command, 输出: $output")
+                deferred.complete(output)
+            }
+
+            override fun onError(error: String) {
+                Log.e(TAG, "命令执行失败: $command, 错误: $error")
+                deferred.complete("")
+            }
+        }
+
+        try {
+            service.executeCommand(command, callback)
+            withTimeoutOrNull(TIMEOUT_MS) {
+                deferred.await()
+            } ?: ""
+        } catch (e: RemoteException) {
+            Log.e(TAG, "执行命令异常: $command, 错误: ${e.message}")
+            ""
+        } catch (e: Exception) {
+            Log.e(TAG, "执行命令超时或异常: $command, 错误: ${e.message}")
+            ""
+        }
+    }
+
+    /**
      * 执行滑动操作（使用协程）
      * @param context 上下文
      * @param startX 起始 X 坐标
@@ -148,8 +193,12 @@ object SwipeUtil {
 
             val command = "input swipe $startX $startY $endX $endY $duration"
             val result = execRootCommand(context, command)
+            
             if (result) {
-                Log.d(TAG, "滑动成功")
+                Log.d(TAG, "滑动命令执行成功，等待滑动完成...")
+                // 等待滑动操作完成（滑动持续时间 + 200ms 缓冲）
+                kotlinx.coroutines.delay(duration + 200)
+                Log.d(TAG, "滑动完成")
             } else {
                 Log.e(TAG, "滑动失败")
             }
@@ -175,117 +224,6 @@ object SwipeUtil {
         }
         return swipe(context, path[0], path[1], path[2], path[3], duration)
     }
-
-    /**
-     * 执行点击操作（使用协程）
-     * @param context 上下文
-     * @param x X 坐标
-     * @param y Y 坐标
-     * @return 是否成功执行
-     */
-    suspend fun click(context: Context, x: Int, y: Int): Boolean = withContext(Dispatchers.IO) {
-        try {
-            Log.d(TAG, "执行点击: ($x, $y)")
-
-            val command = "input tap $x $y"
-            execRootCommand(context, command)
-        } catch (e: Exception) {
-            Log.e(TAG, "点击操作失败: ${e.message}")
-            false
-        }
-    }
-
-    /**
-     * 执行长按操作（使用协程）
-     * @param context 上下文
-     * @param x X 坐标
-     * @param y Y 坐标
-     * @param duration 长按持续时间（毫秒）
-     * @return 是否成功执行
-     */
-    suspend fun longPress(context: Context, x: Int, y: Int, duration: Long = 1000): Boolean = withContext(Dispatchers.IO) {
-        try {
-            Log.d(TAG, "执行长按: ($x, $y), 耗时: ${duration}ms")
-
-            val command = "input swipe $x $y $x $y $duration"
-            execRootCommand(context, command)
-        } catch (e: Exception) {
-            Log.e(TAG, "长按操作失败: ${e.message}")
-            false
-        }
-    }
-
-    /**
-     * 启动支付宝应用（使用 root 命令）
-     * @param context 上下文
-     * @return 是否成功执行
-     */
-    suspend fun startAlipay(context: Context): Boolean = withContext(Dispatchers.IO) {
-        try {
-            Log.d(TAG, "启动支付宝")
-
-            val command = "am start -n com.eg.android.AlipayGphone/com.eg.android.AlipayGphone.AlipayLogin --ez anim_from_item_click true --ei start_reason 3 --ez anim_not_finish false"
-            val result = execRootCommand(context, command)
-            if (result) {
-                Log.d(TAG, "支付宝启动成功")
-            } else {
-                Log.e(TAG, "支付宝启动失败")
-            }
-            result
-        } catch (e: Exception) {
-            Log.e(TAG, "启动支付宝失败: ${e.message}")
-            false
-        }
-    }
-
-    /**
-     * 启动支付宝应用（使用 root 命令，非协程版本，供 Java 调用）
-     * @param context 上下文
-     * @return 是否成功执行
-     */
-    @JvmStatic
-    fun startAlipaySync(context: Context): Boolean {
-        try {
-            Log.d(TAG, "启动支付宝（同步版本）")
-            GlobalThreadPools.execute {
-                try {
-                    bindService(context)
-                    if (commandService == null) {
-                        Log.e(TAG, "服务未连接，无法启动支付宝")
-                        return@execute
-                    }
-                    val command = "am start -n com.eg.android.AlipayGphone/com.eg.android.AlipayGphone.AlipayLogin"
-                    val deferred = CompletableDeferred<Boolean>()
-                    val callback = object : ICallback.Stub() {
-                        override fun onSuccess(output: String?) {
-                            Log.d(TAG, "支付宝启动成功: $output")
-                            deferred.complete(true)
-                        }
-
-                        override fun onError(error: String?) {
-                            Log.e(TAG, "支付宝启动失败: $error")
-                            deferred.complete(false)
-                        }
-                    }
-                    commandService?.executeCommand(command, callback)
-                    val result = deferred.await()
-                    
-                    if (result) {
-                        Log.d(TAG, "等待用户完成滑块验证...")
-                        Thread.sleep(10000)
-                        Log.d(TAG, "滑块验证等待完成")
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "启动支付宝异常: ${e.message}")
-                }
-            }
-            return true
-        } catch (e: Exception) {
-            Log.e(TAG, "启动支付宝失败: ${e.message}")
-            return false
-        }
-    }
-
 
 
     /**

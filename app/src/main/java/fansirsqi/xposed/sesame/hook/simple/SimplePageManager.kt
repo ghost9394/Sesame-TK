@@ -180,6 +180,7 @@ object SimplePageManager {
                         val dialog = param.thisObject as android.app.Dialog
                         dialogs.add(WeakReference(dialog))
                         Log.d(TAG, "Dialog created via constructor(Context), total: ${dialogs.size}")
+                        triggerDialogProcessing()
                     }
                 }
             )
@@ -199,6 +200,7 @@ object SimplePageManager {
                         val dialog = param.thisObject as android.app.Dialog
                         dialogs.add(WeakReference(dialog))
                         Log.d(TAG, "Dialog created via constructor(Context,theme), total: ${dialogs.size}")
+                        triggerDialogProcessing()
                     }
                 }
             )
@@ -219,12 +221,39 @@ object SimplePageManager {
                         val dialog = param.thisObject as android.app.Dialog
                         dialogs.add(WeakReference(dialog))
                         Log.d(TAG, "Dialog created via constructor(Context,cancelable,cancelListener), total: ${dialogs.size}")
+                        triggerDialogProcessing()
                     }
                 }
             )
             Log.i(TAG, "Hook Dialog constructor(Context,cancelable,cancelListener) success")
         } catch (e: Throwable) {
             Log.e(TAG, "Hook Dialog constructor(Context,cancelable,cancelListener) error: ${e.message}")
+        }
+        
+        try {
+            val captchaDialogClass = de.robv.android.xposed.XposedHelpers.findClass(
+                "com.alipay.rdssecuritysdk.v3.captcha.view.CaptchaDialog",
+                getClassLoader()
+            )
+            CompatHelpers.findAndHookMethod(
+                captchaDialogClass,
+                "show",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        val dialog = param.thisObject as android.app.Dialog
+                        if (!dialogs.any { it.get() === dialog }) {
+                            dialogs.add(WeakReference(dialog))
+                            Log.d(TAG, "CaptchaDialog.show() called, added to dialogs, total: ${dialogs.size}")
+                            triggerDialogProcessing()
+                        } else {
+                            Log.d(TAG, "CaptchaDialog.show() called, already in dialogs")
+                        }
+                    }
+                }
+            )
+            Log.i(TAG, "Hook CaptchaDialog.show() success")
+        } catch (e: Throwable) {
+            Log.e(TAG, "Hook CaptchaDialog.show() error: ${e.message}")
         }
     }
     
@@ -246,6 +275,29 @@ object SimplePageManager {
             triggerActivityActive(activity, handler, 0)
         } else {
             Log.i(TAG, "triggerActivity not found activity handler: ${activity.javaClass.name}")
+        }
+    }
+    
+    /**
+     * 触发 Dialog 处理
+     */
+    private fun triggerDialogProcessing() {
+        val activity = topActivity ?: run {
+            Log.i(TAG, "triggerDialogProcessing: no top activity found")
+            return
+        }
+        
+        val handler = activityFocusHandlerMap[activity.javaClass.name]
+        if (handler != null) {
+            if (hasPendingActivityTask) {
+                Log.d(TAG, "triggerDialogProcessing: has pending activity task, skip")
+                return
+            }
+            hasPendingActivityTask = true
+            Log.i(TAG, "triggerDialogProcessing: triggering activity handler for Dialog: ${activity.javaClass.name}")
+            triggerActivityActive(activity, handler, 0)
+        } else {
+            Log.d(TAG, "triggerDialogProcessing: not found activity handler: ${activity.javaClass.name}")
         }
     }
     

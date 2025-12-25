@@ -24,6 +24,9 @@ import fansirsqi.xposed.sesame.model.BaseModel;
  */
 public class NewRpcBridge implements RpcBridge {
     private static final String TAG = NewRpcBridge.class.getSimpleName();
+    private static final long ALIPAY_START_DEBOUNCE_TIME = 8000L; // 支付宝启动防抖时间：8秒
+    private static volatile long lastAlipayStartTime = 0L; // 上次启动支付宝的时间戳
+    private static final Object alipayStartLock = new Object(); // 支付宝启动锁
     private ClassLoader loader;
     private Object newRpcInstance;
     private Method parseObjectMethod;
@@ -289,13 +292,29 @@ public class NewRpcBridge implements RpcBridge {
                         String response = rpcEntity.getResponseString();
                         String methodName = rpcEntity.getRequestMethod();
 
-                        // 检测安全验证错误，自动启动支付宝
+                        // 检测安全验证错误，自动启动支付宝（带防抖）
                         if (errorMessage != null && errorMessage.contains("为了保障您的操作安全，请进行验证后继续")) {
-                           // Log.error(TAG, "检测到安全验证错误，自动启动支付宝进行滑块中...");
-                            Toast.INSTANCE.show(
-                                    "检测到安全验证错误，自动启动支付宝进行滑块中..."
-                            );
-                            SwipeUtil.startBySchemeSync(ApplicationHook.getAppContext());
+                            long currentTime = System.currentTimeMillis();
+                            long timeSinceLastStart = currentTime - lastAlipayStartTime;
+                            if (timeSinceLastStart < ALIPAY_START_DEBOUNCE_TIME) {
+                                Log.debug(TAG, "距离上次启动支付宝仅 " + timeSinceLastStart + "ms，跳过本次启动");
+                            } else {
+                                synchronized (alipayStartLock) {
+                                    // 双重检查，防止多线程竞争
+                                    currentTime = System.currentTimeMillis();
+                                    timeSinceLastStart = currentTime - lastAlipayStartTime;
+                                    if (timeSinceLastStart < ALIPAY_START_DEBOUNCE_TIME) {
+                                        Log.debug(TAG, "距离上次启动支付宝仅 " + timeSinceLastStart + "ms，跳过本次启动（双重检查）");
+                                    } else {
+                                        lastAlipayStartTime = currentTime;
+                                        Log.debug(TAG, "检测到安全验证错误，自动启动支付宝进行滑块中...");
+                                        Toast.INSTANCE.show(
+                                                "为了保障您的操作安全，请进行验证后继续,自动启动支付宝进行滑块中..."
+                                        );
+                                        SwipeUtil.startBySchemeSync(ApplicationHook.getAppContext());
+                                    }
+                                }
+                            }
                             return null;
                         }
 
