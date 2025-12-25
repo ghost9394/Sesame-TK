@@ -554,39 +554,58 @@ class AntOrchard : ModelTask() {
         }
     }
 
-    //小组件回访奖励
     private fun receiveOrchardVisitAward() {
         try {
-            val response = AntOrchardRpcCall.receiveOrchardVisitAward()
-            val jo = JSONObject(response)
+            // 定义两种奖励来源
+            val awardSources = listOf(
+                Pair("tmall", "upgrade_tmall_exchange_task"),
+                Pair("widget", "widget_shoufei")
+            )
 
+            // 记录是否有成功领取到奖励
+            var hasAwardReceived = false
 
-            if (!ResChecker.checkRes(TAG, response)) {
-                Log.error(TAG, "领取回访奖励失败: $response")
-                return
+            // 遍历所有奖励来源
+            for ((diversionSource, source) in awardSources) {
+               // Log.debug(TAG, "尝试领取回访奖励: diversionSource=$diversionSource, source=$source")
+
+                val response = AntOrchardRpcCall.receiveOrchardVisitAward(diversionSource, source)
+                val jo = JSONObject(response)
+
+                // 检查响应是否成功
+                if (!ResChecker.checkRes(TAG, response)) {
+                    Log.error(TAG, "领取回访奖励失败 (source=$source): $response")
+                    continue
+                }
+
+                val awardList = jo.optJSONArray("orchardVisitAwardList")
+                if (awardList == null || awardList.length() == 0) {
+                    Log.record(TAG, "领取回访奖励完成 (source=$source): 无奖励，可能已领取过")
+                    continue
+                }
+
+                // 遍历所有奖励内容
+                for (i in 0 until awardList.length()) {
+                    val awardObj = awardList.optJSONObject(i) ?: continue
+
+                    val awardCount = awardObj.optInt("awardCount", 0)
+                    val awardDesc = awardObj.optString("awardDesc", "")
+                    Log.farm("回访奖励[$awardDesc] $awardCount g肥料")
+                    hasAwardReceived = true
+                }
             }
 
-            val awardList = jo.optJSONArray("orchardVisitAwardList")
-            if (awardList == null || awardList.length() == 0) {
-                Log.record(TAG, "领取回访奖励失败: 无奖励，可能已领取过")
+            // 如果至少有一个来源领取到了奖励，则设置标记
+            if (hasAwardReceived) {
                 Status.setFlagToday(StatusFlags.FLAG_ANTORCHARD_WIDGET_DAILY_AWARD)
-                return
+                Log.record(TAG, "回访奖励领取完成")
+            } else {
+                Log.record(TAG, "回访奖励已全部领取或无可领取奖励")
             }
-
-            // 遍历所有奖励内容
-            for (i in 0 until awardList.length()) {
-                val awardObj = awardList.optJSONObject(i) ?: continue
-
-                val awardCount = awardObj.optInt("awardCount", 0)
-                val awardDesc = awardObj.optString("awardDesc", "")
-                Log.farm("回访奖励[$awardDesc] $awardCount g肥料")
-            }
-            Status.setFlagToday(StatusFlags.FLAG_ANTORCHARD_WIDGET_DAILY_AWARD)
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "receiveOrchardVisitAward err:", t)
         }
     }
-
     //限时奖励
     private fun limitedTimeChallenge() {
         try {

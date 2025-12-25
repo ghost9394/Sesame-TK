@@ -122,13 +122,38 @@ object AntOrchardRpcCall {
         )
     }
 
-    //收取回访奖励 小组件的
+   /* //收取回访奖励 小组件的
     fun receiveOrchardVisitAward(): String {
         return RequestManager.requestString(
             "com.alipay.antorchard.receiveOrchardVisitAward",
             "[{\"diversionSource\":\"widget\",\"requestType\":\"NORMAL\",\"sceneCode\":\"ORCHARD\",\"source\":\"widget_shoufei\",\"version\":\"$VERSION\"}]"
         )
+    }*/
+
+    /**
+     * 收取果园回访奖励
+     * @param diversionSource 引流来源（如：widget、tmall）
+     * @param source 具体来源（如：widget_shoufei、upgrade_tmall_exchange_task）
+     * @return 请求结果字符串
+     */
+    fun receiveOrchardVisitAward(
+        diversionSource: String,
+        source: String
+    ): String {
+        val requestParams = """
+        [{"diversionSource":"$diversionSource",
+          "requestType":"NORMAL",
+          "sceneCode":"ORCHARD",
+          "source":"$source",
+          "version":"$VERSION"}]
+    """.trimIndent()
+
+        return RequestManager.requestString(
+            "com.alipay.antorchard.receiveOrchardVisitAward",
+            requestParams
+        )
     }
+
 
     fun orchardSyncIndex(Wua: String): String {
         val jsonArgs = """
