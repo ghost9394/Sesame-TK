@@ -8,6 +8,7 @@ import fansirsqi.xposed.sesame.util.ResChecker
 import kotlinx.coroutines.*
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.max
 
 /**
  * 6秒拼手速打地鼠
@@ -19,8 +20,8 @@ object WhackMole {
     /** 一次性启动的游戏局数：可配置 */
     @Volatile
     private var totalGames = 5
-    /** 游戏总时长（毫秒）：严格等待10秒，让所有局完成 */
-    private const val GAME_DURATION_MS = 10000L
+    /** 游戏总时长（毫秒）：严格等待12秒，让所有局完成 */
+    private const val GAME_DURATION_MS = 12000L
     /** 全局协程作用域：用于管理所有协程，SupervisorJob确保子协程失败不影响其他 */
     private val globalScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -179,6 +180,7 @@ object WhackMole {
     private suspend fun settleBestRound(session: GameSession): Int = withContext(Dispatchers.IO) {
         try {
             // 调用单参的settlementWhackMole()（其他参数已内联）
+            delay(max(50L, 200L)) // 短暂延时，避免请求过快
             val resp = JSONObject(AntForestRpcCall.settlementWhackMole(session.token))
 
             if (ResChecker.checkRes(TAG, resp)) {

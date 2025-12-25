@@ -829,52 +829,127 @@ class AntMember : ModelTask() {
      * 会员积分0元兑，权益道具兑换
      */
     private fun memberPointExchangeBenefit() {
+        val userId = UserMap.currentUid
         try {
-            val userId = UserMap.currentUid
-            val memberInfo = JSONObject(AntMemberRpcCall.queryMemberInfo())
+            Log.record(TAG, "会员积分🎐任务启动...")
+
+            // 1. 分类配置直接放在函数内部
+            val categoryMap = mapOf(
+                "公益道具" to listOf("94000SR2025022012011004"),
+                "出行旅游" to listOf("94000SR2025010611441006", "94000SR2025010611458001"),
+                "餐饮" to listOf("94000SR2025110315351006"),
+                "皮肤藏品" to listOf("94000SR2025110315357001", "94000SR2025111015444005"),
+                "理财还款" to listOf("94000SR2025011411575008", "94000SR2025091814834002"),
+                "红包神券" to listOf("94000SR2025092414916001"),
+                "充值缴费" to listOf("94000SR2025011611640002", "94000SR2025091814821018")
+            )
+
+            // 2. 获取会员积分余额信息
+            val memberInfoStr = AntMemberRpcCall.queryMemberInfo()
+            val memberInfo = JSONObject(memberInfoStr)
             if (!ResChecker.checkRes(TAG, memberInfo)) {
+                Log.record(TAG, "会员积分[queryMemberInfo错误]: $memberInfoStr")
                 return
             }
-            val pointBalance = memberInfo.getString("pointBalance")
-            val jo = JSONObject(AntMemberRpcCall.queryShandieEntityList(userId, pointBalance))
-            if (!ResChecker.checkRes(TAG, jo)) {
-                return
-            }
-            if (!jo.has("benefits")) {
-                Log.record(TAG, "会员积分[未找到可兑换权益]")
-                return
-            }
-            val benefits = jo.getJSONArray("benefits")
-            for (i in 0..<benefits.length()) {
-                val benefitInfo = benefits.getJSONObject(i)
-                val pricePresentation = benefitInfo.getJSONObject("pricePresentation")
-                val name = benefitInfo.getString("name")
-                val benefitId = benefitInfo.getString("benefitId")
-                IdMapManager.getInstance(MemberBenefitsMap::class.java).add(benefitId, name)
-                if (!canMemberPointExchangeBenefitToday(benefitId)
-                    || !memberPointExchangeBenefitList!!.value.contains(benefitId)
-                ) {
-                    continue
+            val pointBalance = memberInfo.optString("pointBalance", "0")
+            Log.record(TAG, "当前账户积分余额: $pointBalance")
+
+            // 3. 遍历分类
+            categoryMap.forEach { (catName, ids) ->
+                var currentPage = 1
+                var hasNextPage = true
+
+                while (hasNextPage) {
+                   // Log.record(TAG, "正在请求分类[$catName] 第 $currentPage 页")
+
+                    // 调用你刚才提供的 Java RPC 方法
+                    val responseStr = AntMemberRpcCall.queryDeliveryZoneDetail(ids, currentPage, 48)
+
+                    if (responseStr.isNullOrEmpty()) {
+                        Log.error(TAG, "分类[$catName] 接口返回空字符串")
+                        break
+                    }
+
+                    val jo = JSONObject(responseStr)
+                    if (!ResChecker.checkRes(TAG, jo)) {
+                        Log.error(TAG, "分类[$catName] 校验失败: $responseStr")
+                        break
+                    }
+
+                    val benefits = jo.optJSONArray("briefConfigInfos")
+                    if (benefits == null || benefits.length() == 0) {
+                        Log.error(TAG, "分类[$catName] 第 $currentPage 页没有权益数据")
+                        break
+                    }
+
+                    // 4. 遍历当前页的权益
+                    for (i in 0 until benefits.length()) {
+                        val rawItem = benefits.getJSONObject(i)
+                        // 兼容 benefitInfo 嵌套结构
+                        val benefit = if (rawItem.has("benefitInfo")) rawItem.getJSONObject("benefitInfo") else rawItem
+
+                        val name = benefit.optString("name", "未知")
+                        val benefitId = benefit.optString("benefitId")
+                        val itemId = benefit.optString("itemId")
+                        val pointNeeded = benefit.optJSONObject("pricePresentation")?.optString("point") ?: "0"
+
+                        if (benefitId.isEmpty()){
+                            Log.record(TAG, "商品[$name] 没有 benefitId，跳过")
+                            continue
+                        }
+
+                        // 记录 benefitId 映射关系
+                        IdMapManager.getInstance(MemberBenefitsMap::class.java).add(benefitId, name)
+
+                        // 校验是否在白名单
+                        val inWhiteList = memberPointExchangeBenefitList?.value?.contains(benefitId) ?: false
+                        if (!inWhiteList) {
+                            // 如果不在白名单，保持安静，不刷 record 日志，或者你可以按需开启
+                            continue
+                        }
+
+                        // 校验频率限制
+                        if (!canMemberPointExchangeBenefitToday(benefitId)) {
+                            Log.record(TAG, "跳过[$name]: 今日已兑换过")
+                            continue
+                        }
+
+                        // 5. 执行兑换
+                        Log.record(TAG, "准备兑换[$name], ID: $benefitId, 需积分: $pointNeeded")
+                        if (exchangeBenefit(benefitId, userId)) {
+                            Log.other("会员积分🎐兑换[$name]#花费[$pointNeeded 积分]")
+                        } else {
+                            Log.record(TAG, "兑换失败: $name (ItemId: $itemId)")
+                        }
+                    }
+
+                    // 6. 处理分页: nextPageNum 不为 0 且大于当前页则继续
+                    val nextPageNum = jo.optInt("nextPageNum", 0)
+                    if (nextPageNum > 0 && nextPageNum > currentPage) {
+                        //Log.record(TAG, "发现下一页: $nextPageNum，继续查询...")
+                        currentPage = nextPageNum
+                    } else {
+                       // Log.record(TAG, "分类[$catName] 处理完毕，无更多页码")
+                        hasNextPage = false
+                    }
                 }
-                val itemId = benefitInfo.getString("itemId")
-                if (exchangeBenefit(benefitId, itemId)) {
-                    val point = pricePresentation.getString("point")
-                    Log.other("会员积分🎐兑换[" + name + "]#花费[" + point + "积分]")
-                } else {
-                    Log.other("会员积分🎐兑换[$name]失败！")
-                }
+                IdMapManager.getInstance(MemberBenefitsMap::class.java).save(userId)
+                Log.record(TAG, "分类[$catName]处理完毕，已执行中间保存")
             }
+
+            // 7. 保存映射表
             IdMapManager.getInstance(MemberBenefitsMap::class.java).save(userId)
-        } catch (e: JSONException) {
-            Log.printStackTrace(TAG, "JSON解析错误: " + e.message, e)
+            Log.record(TAG, "会员积分🎐全部分类任务处理完毕")
+
         } catch (t: Throwable) {
-            Log.printStackTrace(TAG, "memberPointExchangeBenefit err:", t)
+            Log.record(TAG, "memberPointExchangeBenefit 运行异常: ${t.message}")
+            Log.printStackTrace(TAG, t)
         }
     }
 
-    private fun exchangeBenefit(benefitId: String, itemId: String?): Boolean {
+    private fun exchangeBenefit(benefitId: String, userid: String?): Boolean {
         try {
-            val jo = JSONObject(AntMemberRpcCall.exchangeBenefit(benefitId, itemId))
+            val jo = JSONObject(AntMemberRpcCall.exchangeBenefit(benefitId, userid))
             if (ResChecker.checkRes(TAG + "会员权益兑换失败:", jo)) {
                 memberPointExchangeBenefitToday(benefitId)
                 return true

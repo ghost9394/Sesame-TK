@@ -7,7 +7,8 @@ import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.util.GlobalThreadPools.sleepCompat
 import fansirsqi.xposed.sesame.util.Log
 import fansirsqi.xposed.sesame.util.SwipeUtil
-
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 验证码处理器基类 - 提取公共逻辑
@@ -17,7 +18,14 @@ abstract class BaseCaptchaHandler {
 
     companion object {
         private const val TAG = "CaptchaHandler"
+        private const val DEFAULT_SLIDE_TIMEOUT = 5000L // 滑动操作超时时间5秒
     }
+
+    // 滑动状态锁：防止重复滑动
+    private val isSliding = AtomicBoolean(false)
+    
+    // 记录上次滑动开始时间，用于超时判断
+    private val lastSlideStartTime = AtomicLong(0)
 
     /**
      * 获取滑动路径在 DataStore 中的存储 key
@@ -37,6 +45,19 @@ abstract class BaseCaptchaHandler {
             Log.debug(TAG, "Activity: ${activity.javaClass.name}")
             Log.debug(TAG, "Root View: ${root.getType()}")
             
+            // 检查是否正在滑动中
+            if (isSliding.get()) {
+                val elapsed = System.currentTimeMillis() - lastSlideStartTime.get()
+                // 如果滑动超过5秒还没完成，认为可能卡住了，允许重试
+                if (elapsed < DEFAULT_SLIDE_TIMEOUT) {
+                    Log.captcha(TAG, "当前正在滑动中，跳过本次调用 (已耗时: ${elapsed}ms)")
+                    return false
+                } else {
+                    Log.captcha(TAG, "滑动操作超时(${elapsed}ms)，强制重置状态")
+                    isSliding.set(false)
+                }
+            }
+            
             if (handleSlideCaptcha(activity, root)) {
                 return true
             }
@@ -50,6 +71,15 @@ abstract class BaseCaptchaHandler {
 
     @SuppressLint("SuspiciousIndentation")
     private suspend fun handleSlideCaptcha(activity: Activity, root: SimpleViewImage): Boolean {
+        // 尝试获取滑动锁
+        if (!isSliding.compareAndSet(false, true)) {
+            Log.captcha(TAG, "无法获取滑动锁，另一个滑动正在进行中")
+            return false
+        }
+        
+        // 记录滑动开始时间
+        lastSlideStartTime.set(System.currentTimeMillis())
+        
         return try {
            Log.captcha(TAG, "========== 开始处理滑动验证码 ==========")
            
@@ -66,6 +96,7 @@ abstract class BaseCaptchaHandler {
 
            if (slideText == null) {
                 Log.captcha(TAG, "未找到任何滑动验证相关文字")
+                // 没有验证码，立即释放锁
                 return false
             }
                 
@@ -104,23 +135,43 @@ abstract class BaseCaptchaHandler {
                         Log.captcha(TAG, "滑动路径已保存到DataStore: [${slidePath.joinToString(", ")}]")
                     }
                     Log.captcha(TAG, "路径数据: [${slidePath.joinToString(", ")}]")
-                    sleepCompat(3000)
+                    
                     // 执行滑动操作
+                    Log.captcha(TAG, "正在执行滑动操作...")
                     val swipeSuccess = SwipeUtil.swipe(activity, startX, centerY, endX, centerY, 1000)
+                    
                     if (swipeSuccess) {
-                        Log.captcha(TAG, "滑动操作执行成功")
-                        return true
+                        Log.captcha(TAG, "滑动操作执行成功，等待验证结果...")
+                        
+                        // 滑动成功后，等待一段时间，观察是否验证码消失
+                        sleepCompat(2000)
+                        
+                        // 再次检查是否还存在滑动验证文字
+                        val checkAgain = root.xpath2One("//TextView[contains(@text,'向右滑动验证')]")
+                        if (checkAgain != null) {
+                            Log.captcha(TAG, "滑动后验证码仍存在，可能验证失败，准备重试")
+                            return false // 保持锁状态，让上层决定是否重试
+                        } else {
+                            Log.captcha(TAG, "滑动后验证码已消失，验证成功")
+                            return true
+                        }
                     } else {
                         Log.captcha(TAG, "滑动操作执行失败")
+                        return false
                     }
+                    
                 } catch (e: Exception) {
                     Log.captcha(TAG, "保存滑动路径到DataStore失败: ${e.message}")
+                    return false
                 }
 
-            return false
         } catch (e: Exception) {
             Log.captcha(TAG, "处理滑动验证码时发生异常: ${e.message}")
-            false
+            return false
+        } finally {
+            // 无论成功失败，都要在finally中释放锁
+            isSliding.set(false)
+            Log.captcha(TAG, "滑动锁已释放")
         }
     }
     

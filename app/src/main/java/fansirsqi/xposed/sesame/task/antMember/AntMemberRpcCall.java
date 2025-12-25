@@ -4,6 +4,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.List;
+import java.util.UUID;
+
 import fansirsqi.xposed.sesame.hook.ApplicationHook;
 import fansirsqi.xposed.sesame.hook.RequestManager;
 import fansirsqi.xposed.sesame.util.RandomUtil;
@@ -321,17 +324,69 @@ public class AntMemberRpcCall {
         return RequestManager.requestString("com.alipay.alipaymember.biz.rpc.config.h5.queryShandieEntityList", data);
     }
 
+
+
+
+    public static String queryDeliveryZoneDetail(List<String> deliveryIdList, int pageNum, int pageSize) {
+        // 1. 处理 uniqueId 的拼接逻辑
+        // 固定前缀：17665547901390and99999999INTELLIGENT_SORT92524974
+        String idsJoined = String.join(",", deliveryIdList);
+        String uniqueId = "17665547901390and99999999INTELLIGENT_SORT92524974" + idsJoined;
+
+        // 2. 将 deliveryIdList 转换为 JSON 数组字符串格式
+        // 这里为了简单直观使用 String.format，如果项目中有 Fastjson/Gson 建议使用序列化
+        StringBuilder deliveryIdListJson = new StringBuilder("[");
+        for (int i = 0; i < deliveryIdList.size(); i++) {
+            deliveryIdListJson.append("\"").append(deliveryIdList.get(i)).append("\"");
+            if (i < deliveryIdList.size() - 1) {
+                deliveryIdListJson.append(",");
+            }
+        }
+        deliveryIdListJson.append("]");
+
+        // 3. 构造完整的请求 Data 字符串
+        String data = "[{" +
+                "\"deliveryIdList\":" + deliveryIdListJson.toString() + "," +
+                "\"lowerPoint\":0," +
+                "\"pageNum\":" + pageNum + "," +
+                "\"pageSize\":" + pageSize + "," +
+                "\"queryNoReserve\":true," +
+                "\"resourceCardChannel\":\"ZERO_EXCHANGE_CHANNEL\"," +
+                "\"sourcePassMap\":{\"innerSource\":\"\",\"source\":\"\",\"unid\":\"\"}," +
+                "\"startPageFirstQuery\":false," +
+                "\"topIdList\":[\"202412231259661040\"]," +
+                "\"uniqueId\":\"" + uniqueId + "\"," +
+                "\"upperPoint\":99999999," +
+                "\"withPointRange\":false" +
+                "}]";
+
+        return RequestManager.requestString("com.alipay.alipaymember.biz.rpc.config.h5.queryDeliveryZoneDetail", data);
+    }
+
+
     /**
-     * 会员积分兑换道具
+     * 会员积分兑换道具（适配新请求结构）
      *
-     * @param benefitId benefitId
-     * @param itemId    itemId
-     * @return 结果
+     * @param benefitId benefitId（兑换权益ID）
+     * @param userId    userId（用户ID，格式如）
+     * @return 接口请求结果
      */
-    public static String exchangeBenefit(String benefitId, String itemId) {
+    public static String exchangeBenefit(String benefitId, String userId) {
+        // 1. 生成请求ID（前缀+当前毫秒时间戳）
         String requestId = "requestId" + System.currentTimeMillis();
-        String alipayClientVersion = ApplicationHook.getAlipayVersion().getVersionString();
-        String data = "[{\"benefitId\":\"" + benefitId + "\",\"cityCode\":\"\",\"exchangeType\":\"POINT_PAY\",\"itemId\":\"" + itemId + "\",\"miniAppId\":\"\",\"orderSource\":\"\",\"requestId\":\"" + requestId + "\",\"requestSourceInfo\":\"\",\"sourcePassMap\":{\"alipayClientVersion\":\"" + alipayClientVersion + "\",\"innerSource\":\"\",\"mobileOsType\":\"Android\",\"source\":\"\",\"unid\":\"\"},\"userOutAccount\":\"\"}]";
+        // 2. 生成唯一unid（UUID随机生成，也可使用时间戳，此处UUID更规范）
+        String unid = UUID.randomUUID().toString();
+        // 3. 拼接requestSourceInfo（用户ID+|0+当前毫秒时间戳）
+        String requestSourceInfo = String.format("SID:%s%s|0", userId, System.currentTimeMillis());
+        // 4. 构建符合新结构的请求体（移除废弃字段，新增sceneId等必填字段）
+        String data = String.format("[{\"benefitId\":\"%s\",\"exchangeType\":\"POINT_PAY\",\"requestId\":\"%s\",\"requestSourceInfo\":\"%s\",\"sceneId\":\"1209\",\"sourcePassMap\":{\"bid\":\"\",\"feedsIndex\":\"0\",\"innerSource\":\"a169.b52659\",\"isCpc\":\"\",\"source\":\"\",\"unid\":\"%s\",\"uniqueId\":\"%s%s\"}]",
+                benefitId,
+                requestId,
+                requestSourceInfo,
+                unid,
+                userId,
+                System.currentTimeMillis());
+        // 5. 发起接口请求并返回结果
         return RequestManager.requestString("com.alipay.alipaymember.biz.rpc.exchange.h5.exchangeBenefit", data);
     }
 
