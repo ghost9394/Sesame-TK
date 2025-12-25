@@ -795,10 +795,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                 val obj = querySelfHome()
                 tc.countDebug("获取自己主页对象信息")
                 if (obj != null) {
-                    // 检查并处理打地鼠（每天一次）
-                    checkAndHandleWhackMole()
-                    tc.countDebug("拼手速")
-
+                    
                     collectEnergy(UserMap.currentUid, obj, "self")
                     Log.record(TAG, "✅ 【正常流程】收取自己的能量完成")
                     tc.countDebug("收取自己的能量")
@@ -826,6 +823,10 @@ class AntForest : ModelTask(), EnergyCollectCallback {
             // 后续任务流程
             // -------------------------------
             if (selfHomeObj != null) {
+                // 检查并处理打地鼠（每天一次）
+                    checkAndHandleWhackMole()
+                    tc.countDebug("拼手速")
+                    
                 val processObj = if (isTeam(selfHomeObj)) {
                     selfHomeObj.optJSONObject("teamHomeResult")
                         ?.optJSONObject("mainMember")
