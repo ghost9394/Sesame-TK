@@ -9,7 +9,6 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
-import android.os.RemoteException
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
@@ -29,7 +28,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fansirsqi.xposed.sesame.BuildConfig
@@ -39,22 +37,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-
-class PreviewDeviceInfoProvider : PreviewParameterProvider<Map<String, String>> {
-    override val values: Sequence<Map<String, String>> = sequenceOf(
-        mapOf(
-            "型号" to "Pixel 6",
-            "产品" to "Google Pixel",
-            "Android ID" to "abcd1234567890ef",
-            "系统" to "Android 13 (33)",
-            "构建" to "UQ1A.230105.002 S1B51",
-            "OTA" to "OTA-12345",
-            "SN" to "SN1234567890",
-            "模块版本" to "v1.0.0-release 📦",
-            "构建日期" to "2023-10-01 12:00 ⏰"
-        )
-    )
-}
+import rikka.shizuku.Shizuku
+import rikka.shizuku.ShizukuProvider
 
 
 @Composable
@@ -104,24 +88,23 @@ fun DeviceInfoCard(info: Map<String, String>) {
 object DeviceInfoUtil {
 
     private const val TAG = "DeviceInfoUtil"
-
     private const val TIMEOUT_MS = 10000L
-
     private const val ACTION_BIND = "fansirsqi.xposed.sesame.action.BIND_COMMAND_SERVICE"
 
     private var commandService: ICommandService? = null
-
     private var isBound = false
 
-    private val connectionDeferred = CompletableDeferred<Unit>()
+    // 修复：使用可空的 Deferred，每次绑定时重新创建，防止状态复用 BUG
+    private var connectionDeferred: CompletableDeferred<Unit>? = null
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             Log.d(TAG, "CommandService 已连接")
             commandService = ICommandService.Stub.asInterface(service)
             isBound = true
-            if (!connectionDeferred.isCompleted) {
-                connectionDeferred.complete(Unit)
+            // 只有当 Deferred 存在且未完成时才完成它
+            connectionDeferred?.let {
+                if (it.isActive) it.complete(Unit)
             }
         }
 
@@ -129,34 +112,30 @@ object DeviceInfoUtil {
             Log.d(TAG, "CommandService 已断开")
             commandService = null
             isBound = false
-            if (!connectionDeferred.isCompleted) {
-                connectionDeferred.completeExceptionally(Exception("服务已断开"))
-            }
         }
     }
 
-    /**
-     * 绑定服务（同步等待连接完成）
-     * @param context 上下文
-     */
     private suspend fun bindService(context: Context): Boolean = withContext(Dispatchers.IO) {
         if (isBound && commandService != null) {
             return@withContext true
         }
 
         try {
+            // 每次尝试绑定前重置 Deferred
+            connectionDeferred = CompletableDeferred()
+
             val intent = Intent(ACTION_BIND)
             intent.setPackage("fansirsqi.xposed.sesame")
-            val result = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-            Log.d(TAG, "绑定服务结果: $result")
+            // 使用 Application Context 绑定，防止 Activity 泄露
+            val result = context.applicationContext.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
 
             if (!result) {
                 return@withContext false
             }
 
-            // 等待服务连接完成，最多等待5秒
+            // 等待连接
             val connected = withTimeoutOrNull(5000) {
-                connectionDeferred.await()
+                connectionDeferred?.await()
             }
             connected != null
         } catch (e: Exception) {
@@ -165,110 +144,57 @@ object DeviceInfoUtil {
         }
     }
 
-    /**
-     * 执行 Root 命令（通过 AIDL）
-     * @param context 上下文
-     * @param command 要执行的命令
-     * @return 命令执行结果
-     */
-    private suspend fun execRootCommand(context: Context, command: String): String = withContext(Dispatchers.IO) {
-        if (!bindService(context)) {
-            Log.e(TAG, "无法绑定 CommandService")
-            return@withContext ""
-        }
-
-        val service = commandService
-        if (service == null) {
-            Log.e(TAG, "CommandService 未连接")
-            return@withContext ""
-        }
+    // 执行命令的核心方法
+    private suspend fun execCommand(context: Context, command: String): String = withContext(Dispatchers.IO) {
+        if (!bindService(context)) return@withContext ""
+        val service = commandService ?: return@withContext ""
 
         val deferred = CompletableDeferred<String>()
-
         val callback = object : ICallback.Stub() {
             override fun onSuccess(output: String) {
-              //  Log.d(TAG, "命令执行成功: $command")
                 deferred.complete(output)
             }
 
             override fun onError(error: String) {
-                Log.e(TAG, "命令执行失败: $command, 错误: $error")
+                Log.e(TAG, "CMD Error: $error")
                 deferred.complete("")
             }
         }
 
         try {
             service.executeCommand(command, callback)
-            withTimeoutOrNull(TIMEOUT_MS) {
-                deferred.await()
-            } ?: ""
-        } catch (e: RemoteException) {
-            Log.e(TAG, "执行命令异常: $command, 错误: ${e.message}")
-            ""
-        } catch (e: Exception) {
-            Log.e(TAG, "执行命令超时或异常: $command, 错误: ${e.message}")
+            withTimeoutOrNull(TIMEOUT_MS) { deferred.await() } ?: ""
+        } catch (_: Exception) {
             ""
         }
     }
 
     /**
-     * 检测 Root 权限（通过 AIDL）
-     * @param context 上下文
-     * @return 是否有 Root 权限
+     * 辅助方法：检查 Shizuku 服务状态（仅用于 UI 显示辅助）
      */
-    private suspend fun checkRootPermission(context: Context): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val output = execRootCommand(context, "id")
-            val success = output.contains("uid=0")
-
-            if (success) {
-                Log.d(TAG, "Root 权限检测成功")
-            } else {
-                Log.e(TAG, "Root 权限检测失败，输出: $output")
-            }
-            success
-        } catch (e: Exception) {
-            Log.e(TAG, "Root 权限检测异常: ${e.message}")
-            false
-        }
-    }
-
-    /**
-     * 检测 Shizuku 权限
-     * @return 是否有 Shizuku 权限
-     */
-    private fun checkShizukuPermission(): Boolean {
+    private fun isShizukuAvailable(context: Context): Boolean {
         return try {
-            Class.forName("rikka.shizuku.Shizuku")
-            val checkPermissionMethod = Class.forName("rikka.shizuku.Shizuku")
-                .getMethod("checkSelfPermission", String::class.java)
-            val granted = checkPermissionMethod.invoke(null, "rikka.shizuku.permission.REQUEST") as Int
-            granted == 0
-        } catch (e: Exception) {
+            if (!Shizuku.pingBinder()) return false
+            // 使用你 MainActivity 里申请过的权限检查
+            context.checkSelfPermission(ShizukuProvider.PERMISSION) == PackageManager.PERMISSION_GRANTED
+        } catch (_: Throwable) {
             false
         }
     }
 
     suspend fun showInfo(vid: String, context: Context): Map<String, String> = withContext(Dispatchers.IO) {
+        // 1. 获取设备属性的方法
         fun getProp(prop: String): String {
             return try {
                 val p = Runtime.getRuntime().exec("getprop $prop")
-                p.inputStream.bufferedReader().readLine().orEmpty()
+                p.inputStream.bufferedReader().readLine() ?: ""
             } catch (_: Exception) {
                 ""
             }
         }
 
         fun getDeviceName(): String {
-            val candidates = listOf(
-                "ro.vendor.oplus.market.enname",
-                "ro.vendor.oplus.market.name",
-                "ro.product.marketname",
-                "ro.vivo.market.name",
-                "ro.oppo.market.name",
-                "ro.product.odm.device",
-                "ro.product.brand"
-            )
+            val candidates = listOf("ro.product.marketname", "ro.product.model")
             for (prop in candidates) {
                 val value = getProp(prop)
                 if (value.isNotBlank()) return value
@@ -276,24 +202,35 @@ object DeviceInfoUtil {
             return "${Build.BRAND} ${Build.MODEL}"
         }
 
-        val rootPermission = checkRootPermission(context)
-        val shizukuPermission = checkShizukuPermission()
+        // 2. 关键修改：通过执行 id 命令来判断当前使用的是什么权限
+        val idOutput = execCommand(context, "id")
+
+        // 3. 判断 Shizuku 服务是否可用（辅助信息）
+        val shizukuAvailable = isShizukuAvailable(context)
+
+        // 4. 生成权限状态字符串
         val permissionStatus = when {
-            rootPermission && shizukuPermission -> "Root + Shizuku ✓"
-            rootPermission -> "Root ✓"
-            shizukuPermission -> "Shizuku ✓"
-            else -> "None ✗"
+            // 如果 id 命令返回 uid=0，说明正在使用 Root
+            idOutput.contains("uid=0") -> {
+                //ROOT与Shizuku二选一即可
+                if (shizukuAvailable) "Root or Shizuku ✔" else "Root ✔"
+            }
+            // 如果 id 命令返回 uid=2000 或 shell，说明正在使用 Shizuku
+            idOutput.contains("uid=2000") || idOutput.contains("shell") -> "Shizuku (Shell) ✓"
+            // 否则就是没权限
+            else -> {
+                if (shizukuAvailable) "Shizuku Ready ✔" else "未授权滑块服务 ❌"
+            }
         }
 
         mapOf(
             "Product" to "${Build.MANUFACTURER} ${Build.PRODUCT}",
             "Device" to getDeviceName(),
-            "Android Version" to "${Build.VERSION.RELEASE} SDK (${Build.VERSION.SDK_INT})",
-            "OS Build" to "${Build.DISPLAY}",
-            "Permission" to permissionStatus,
+            "Android Version" to "${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})",
             "Verify ID" to vid,
-            "Module Version" to "v${BuildConfig.VERSION_NAME}.${BuildConfig.BUILD_TYPE} 📦",
-            "Module Build" to "${BuildConfig.BUILD_DATE} ${BuildConfig.BUILD_TIME} ⏰"
+            "Captcha Permission" to permissionStatus,
+            "Module Version" to "v${BuildConfig.VERSION_NAME}",
+            "Module Build" to "${BuildConfig.BUILD_DATE} ${BuildConfig.BUILD_TIME}"
         )
     }
 }

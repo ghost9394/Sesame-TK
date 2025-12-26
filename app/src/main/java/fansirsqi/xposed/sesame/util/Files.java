@@ -91,7 +91,7 @@ public class Files {
     private static File getLogDir() {
         File logDir = new File(MAIN_DIR, "log");
         ensureDir(logDir);
-        return logDir.exists() ? logDir : null;
+        return logDir;
     }
 
     /**
@@ -282,23 +282,6 @@ public class Files {
      *
      * @return 导出的统计文件
      */
-    public static File getExportedStatisticsFile() {
-        try {
-            String storageDirStr = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + File.separator + CONFIG_DIR_NAME;
-            File storageDir = new File(storageDirStr);
-            if (!storageDir.exists()) {
-                if (storageDir.mkdirs()) {
-                    Log.system(TAG, "create downloads's " + CONFIG_DIR_NAME + " directory success");
-                } else {
-                    Log.error(TAG, "create downloads's " + CONFIG_DIR_NAME + " directory failed");
-                }
-            }
-            return getTargetFileofDir(storageDir, "statistics.json");
-        } catch (Exception e) {
-            Log.printStackTrace(TAG + "export statistics file error", e);
-            return null;
-        }
-    }
 
     public static File getFriendWatchFile(String userId) {
         return getTargetFileofUser(userId, "friendWatch.json");

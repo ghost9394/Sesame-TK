@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Context
 import fansirsqi.xposed.sesame.hook.simple.SimplePageManager
 import fansirsqi.xposed.sesame.hook.simple.SimpleViewImage
+import fansirsqi.xposed.sesame.model.BaseModel
 import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.util.GlobalThreadPools.sleepCompat
 import fansirsqi.xposed.sesame.util.Log
@@ -79,29 +80,47 @@ abstract class BaseCaptchaHandler {
     private suspend fun handleSlideCaptcha(activity: Activity, root: SimpleViewImage): Boolean {
         return try {
             Log.captcha(TAG, "========== 开始处理滑动验证码 ==========")
-            
+
             val slideTextInDialog = findSlideTextInDialog()
             if (slideTextInDialog == null) {
                 Log.captcha(TAG, "Dialog 中未找到滑动验证文字，跳过处理")
                 return false
             }
             Log.captcha(TAG, "发现滑动验证文字: ${slideTextInDialog.getText()}")
-            
             val slideRect = getSlideRect(slideTextInDialog) ?: run {
                 Log.captcha(TAG, "未找到父节点")
                 return false
             }
+            val slidePath = calculateSlidePath(activity, slideRect) // 计算滑动路径
 
-            val slidePath = calculateSlidePath(activity, slideRect)
-            logSlideInfo(activity, slideRect, slidePath)
-            
-            val hasRootPermission = checkRootPermission(activity)
-            if (hasRootPermission) {
-                saveSlidePathIfNeeded(slidePath)
+
+            // logSlideInfo(activity, slideRect, slidePath)
+
+            if (!BaseModel.enableRootSlide.value) {
+                Log.captcha(TAG, "Sesame-TK Root滑块功能已关闭，跳过Root滑动")
             } else {
-                Log.captcha(TAG, "无 Root 权限，跳过保存滑动路径")
+                val hasRootPermission = checkRootPermission(activity)
+                if (hasRootPermission) {
+                    saveSlidePathIfNeeded(slidePath) // 保存滑动路径到 DataStore
+                    executeSlideWithRetry(activity, root, slidePath) // 执行滑动并重试
+                } else {
+                    Log.captcha(TAG, "无Sesame-TK Root 权限，跳过保存滑动路径")
+                }
             }
-            executeSlideWithRetry(activity, root, slidePath)
+
+            // 发送广播通知滑动路径
+            if (BaseModel.enableSlideBroadcast.value) {
+                ApplicationHook.sendBroadcastShell(
+                    getSlidePathKey(),
+                    "input swipe " + slidePath.toIntArray().joinToString(" ")
+                )
+                saveSlidePathIfNeeded(slidePath)
+
+            } else {
+                Log.captcha(TAG, "滑动路径广播功能已关闭")
+            }
+
+            true
         } catch (_: Exception) {
           //  Log.captcha(TAG, "处理滑动验证码时发生异常: ${e.message}")
             false
@@ -188,9 +207,10 @@ abstract class BaseCaptchaHandler {
                 slidePath.endY,
                 SLIDE_DURATION
             )
+          //  ApplicationHook.sendBroadcast("fansirsqi.xposed.sesame.ACTION_SLIDE_EXECUTED","input swipe 205 1587 1172 1587 500")
             if (swipeSuccess) {
                 Log.captcha(TAG, "滑动操作执行成功，等待验证码文本消失...")
-                sleepCompat(1500)
+                sleepCompat(2500)
                 Log.captcha(TAG, "开始检测验证码文本...")
                 if (checkCaptchaTextGone(root)) {
                     Log.captcha(TAG, "验证码文本已消失，滑动成功")

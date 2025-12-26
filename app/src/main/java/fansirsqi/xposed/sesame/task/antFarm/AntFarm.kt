@@ -893,7 +893,7 @@ class AntFarm : ModelTask() {
 
     private fun exchangeBenefit(spuId: String?, skuId: String?): Boolean {
         try {
-            val jo = JSONObject(AntFarmRpcCall.exchangeBenefit(spuId, skuId))
+            val jo = JSONObject(AntFarmRpcCall.buyMallItem(spuId, skuId))
             return ResChecker.checkRes(TAG, jo)
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "exchangeBenefit err:",t)
@@ -3674,6 +3674,8 @@ class AntFarm : ModelTask() {
             if (drawActivitySwitch && familyOptions!!.value.contains("familyDrawInfo")) {
                 familyDrawTask(familyUserIds, familyDrawInfo)
             }
+
+
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "family err:",t)
         }
@@ -4084,6 +4086,7 @@ class AntFarm : ModelTask() {
                     list.add(AntFarmFamilyOption("assignRights", "使用顶梁柱特权"))
                     list.add(AntFarmFamilyOption("familyDrawInfo", "开扭蛋"))
                     list.add(AntFarmFamilyOption("batchInviteP2P", "串门送扭蛋"))
+                    list.add(AntFarmFamilyOption("ExchangeFamilyDecoration", "兑换装修物品"))
                     return list
                 }
         }

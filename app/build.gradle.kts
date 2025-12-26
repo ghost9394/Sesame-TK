@@ -48,14 +48,8 @@ android {
             timeZone = TimeZone.getTimeZone("GMT+8")
         }.format(Date())
 
-        val buildTargetCode = try {
-            buildDate.replace("-", ".") + "." + buildTime.replace(":", ".")
-        } catch (_: Exception) {
-            "0000"
-        }
-
         versionCode = gitCommitCount
-        versionName = "0.5.0"
+        versionName = "0.6.0"
 
         buildConfigField("String", "BUILD_DATE", "\"$buildDate\"")
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
@@ -144,9 +138,10 @@ android {
 
 dependencies {
     // Shizuku 相关依赖 - 用于获取系统级权限
-    // implementation(libs.rikka.shizuku.api)        // Shizuku API
-    // implementation(libs.rikka.shizuku.provider)   // Shizuku 提供者
-    // implementation(libs.rikka.refine)             // Rikka 反射工具
+    implementation(libs.rikka.shizuku.api)        // Shizuku API
+    implementation(libs.rikka.shizuku.provider)   // Shizuku 提供者
+    implementation(libs.rikka.refine)             // Rikka 反射工具
+//    implementation(libs.rikka.hidden.stub)
     // implementation(libs.ui.tooling.preview.android)
 
 

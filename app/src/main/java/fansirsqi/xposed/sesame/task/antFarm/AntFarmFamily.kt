@@ -6,6 +6,7 @@ import fansirsqi.xposed.sesame.extensions.JSONExtensions.toJSONArray
 import fansirsqi.xposed.sesame.model.modelFieldExt.SelectModelField
 import fansirsqi.xposed.sesame.task.antFarm.AntFarm.AnimalFeedStatus
 import fansirsqi.xposed.sesame.task.antFarm.AntFarm.AnimalInteractStatus
+import fansirsqi.xposed.sesame.util.GlobalThreadPools
 import fansirsqi.xposed.sesame.util.Log
 import fansirsqi.xposed.sesame.util.RandomUtil
 import fansirsqi.xposed.sesame.util.ResChecker
@@ -116,6 +117,9 @@ data object AntFarmFamily {
 
                 if (familyOptions.value.contains("shareToFriends")) {
                     familyShareToFriends(familyUserIds, notInviteList)
+                }
+                if (familyOptions.value.contains("ExchangeFamilyDecoration")) {
+                    autoExchangeFamilyDecoration()
                 }
             }
         } catch (e: Exception) {
@@ -582,6 +586,130 @@ data object AntFarmFamily {
             Log.printStackTrace(TAG, "familyShareToFriends err:", t)
         }
     }
+
+
+    /**
+     * 自动兑换家庭装扮装扮
+     */
+     fun autoExchangeFamilyDecoration() {
+        Log.record(TAG, "[家庭装扮] 开始自动兑换任务...")
+        try {
+            // 1. 查询家庭装修位置列表
+            val decorationRes = AntFarmRpcCall.queryFamilyDecoration()
+            val decorationJo = JSONObject(decorationRes)
+
+            if (!ResChecker.checkRes(TAG, decorationJo)) {
+                Log.error(TAG, "[家庭装扮] 获取装修位置列表校验失败 $decorationRes")
+                return
+            }
+
+            val positionList = decorationJo.optJSONArray("familyDecorationPositionList")
+            if (positionList == null || positionList.length() == 0) {
+                Log.record(TAG, "[家庭装扮] 未获取到装修位置信息")
+                return
+            }
+
+            Log.record(TAG, "[家庭装扮] 成功获取 ${positionList.length()} 个装修位置")
+
+            // 遍历所有装修位置 (例如：沙发、地毯、窗帘...)
+            for (i in 0 until positionList.length()) {
+                val position = positionList.getJSONObject(i)
+                val settings = position.optJSONObject("settings") ?: continue
+                val mallCode = settings.optString("MALL_CODE")
+                val positionName = position.optString("positionName")
+
+                if (mallCode.isEmpty()) {
+                    Log.record(TAG, "[家庭装扮] 位置 [$positionName] 的 MALL_CODE 为空，跳过")
+                    continue
+                }
+
+                // 2. 分页查询该位置下的商品
+                var startIndex = 0
+                var hasMore = true
+
+                while (hasMore) {
+                    Log.record(TAG, "[家庭装扮] 正在获取 [$positionName] 的商品列表, startIndex: $startIndex")
+                    val itemListRes = AntFarmRpcCall.getItemList(mallCode, 12, startIndex)
+                    val itemJo = JSONObject(itemListRes)
+
+                    if (!ResChecker.checkRes(TAG, itemJo)) {
+                        Log.error(TAG, "[家庭装扮] 获取 [$positionName] 商品列表校验失败： $itemListRes")
+                        break
+                    }
+
+                    // 获取当前余额
+                    val accountInfo = itemJo.optJSONObject("mallAccountInfoVO")
+                    val currentBalance = accountInfo?.optJSONObject("holdingCount")?.optInt("amount") ?: 0
+                    Log.record(TAG, "[家庭装扮] 当前余额: $currentBalance")
+
+                    val items = itemJo.optJSONArray("itemInfoVOList")
+                    if (items == null || items.length() == 0) {
+                        Log.record(TAG, "[家庭装扮] [$positionName] 分类下无商品")
+                        break
+                    }
+
+                    for (j in 0 until items.length()) {
+                        val item = items.getJSONObject(j)
+                        val spuId = item.getString("spuId")
+                        val spuName = item.getString("spuName")
+                        val minPrice = item.getJSONObject("minPrice").optInt("amount")
+
+                        // 余额不足校验
+                        if (currentBalance < minPrice) {
+                            //Log.record(TAG, "[家庭装扮] 余额不足跳过: $spuName (需${minPrice}, 余额${currentBalance})")
+                            continue
+                        }
+
+                        // 检查状态：如果 itemStatusList 不为空，通常表示已拥有或不可买
+                        val itemStatusList = item.optJSONArray("itemStatusList")
+                        if (itemStatusList != null && itemStatusList.length() > 0) {
+                            //Log.record(TAG, "[家庭装扮] 商品 [$spuName] 已拥有或不可购买，跳过")
+                            continue
+                        }
+
+                        // 获取 SKU 进行兑换
+                        val skuList = item.optJSONArray("skuModelList")
+                        if (skuList == null || skuList.length() == 0) {
+                            Log.error(TAG, "[家庭装扮] 商品 [$spuName] 无有效SKU")
+                            continue
+                        }
+
+                        val firstSku = skuList.getJSONObject(0)
+                        val skuId = firstSku.getString("skuId")
+                        val skuName = firstSku.getString("skuName")
+
+                        // 3. 执行兑换
+                        Log.record(TAG, "[家庭装扮] 尝试兑换: $skuName (SPU:$spuId, SKU:$skuId)")
+                        val exchangeRes = AntFarmRpcCall.exchangeBenefit(spuId, skuId)
+                        val exchangeJo = JSONObject(exchangeRes)
+
+                        if (ResChecker.checkRes(TAG, exchangeJo)) {
+                            Log.farm("装扮兑换💸#位置[$positionName]#花费[$minPrice]#购买[$skuName]")
+                        } else {
+                            val memo = exchangeJo.optString("memo", "返回结果异常")
+                            Log.error(TAG, "[家庭装扮] 兑换失败: $skuName, 原因: $memo")
+                        }
+
+                        GlobalThreadPools.sleepCompat(3000) // 兑换间隔，保护账号
+                    }
+
+                    // 处理翻页
+                    val nextIndex = itemJo.optInt("nextStartIndex", 0)
+                    val hasMoreField = itemJo.optBoolean("hasMore", false)
+
+                    if (hasMoreField && nextIndex > 0 && nextIndex != startIndex) {
+                        startIndex = nextIndex
+                    } else {
+                        hasMore = false
+                    }
+                }
+            }
+            Log.record(TAG, "[家庭装扮] 自动兑换任务结束")
+        } catch (t: Throwable) {
+            Log.printStackTrace(TAG, "autoExchangeFamilyDecoration 错误",t)
+        }
+    }
+
 
     /**
      * 通用时间差格式化（自动区分过去/未来）

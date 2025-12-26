@@ -1,7 +1,6 @@
 package fansirsqi.xposed.sesame.task.antForest
 
 import android.annotation.SuppressLint
-import com.fasterxml.jackson.core.type.TypeReference
 import de.robv.android.xposed.XposedHelpers
 import fansirsqi.xposed.sesame.data.RuntimeInfo
 import fansirsqi.xposed.sesame.data.Status
@@ -28,7 +27,6 @@ import fansirsqi.xposed.sesame.model.modelFieldExt.ListModelField.ListJoinCommaT
 import fansirsqi.xposed.sesame.model.modelFieldExt.SelectAndCountModelField
 import fansirsqi.xposed.sesame.model.modelFieldExt.SelectModelField
 import fansirsqi.xposed.sesame.model.modelFieldExt.StringModelField
-import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.newutil.TaskBlacklist
 import fansirsqi.xposed.sesame.task.ModelTask
 import fansirsqi.xposed.sesame.task.TaskCommon
@@ -1070,7 +1068,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                         continue
                     }
                 }
-                GlobalThreadPools.sleepCompat(1000L)
+                GlobalThreadPools.sleepCompat(500L)
             } catch (e: JSONException) {
                 Log.record(TAG, "浇水金球JSON解析错误: " + e.message)
             } catch (e: RuntimeException) {
@@ -1313,7 +1311,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                         Log.record(TAG, "活力值兑换失败: " + getNameById(skuId))
                         break
                     }
-                    GlobalThreadPools.sleepCompat(5000L)
+                    GlobalThreadPools.sleepCompat(1000L)
                 }
             }
         } catch (t: Throwable) {

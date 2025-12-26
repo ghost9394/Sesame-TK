@@ -3,30 +3,33 @@ package fansirsqi.xposed.sesame.service
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
-import android.os.RemoteCallbackList
-import android.os.RemoteException
 import android.util.Log
 import fansirsqi.xposed.sesame.ICallback
 import fansirsqi.xposed.sesame.ICommandService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.io.BufferedReader
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import rikka.shizuku.Shizuku
+import java.io.IOException
 
 /**
  * 命令执行服务
- * 在 Xposed 模块进程中运行，执行 root 命令
+ * 支持 Root (su) 和 Shizuku (adb shell)
  */
 class CommandService : Service() {
 
     companion object {
         private const val TAG = "CommandService"
-        private const val ACTION_BIND = "fansirsqi.xposed.sesame.action.BIND_COMMAND_SERVICE"
+
+        // 设置命令执行超时时间，例如 15 秒
+        private const val COMMAND_TIMEOUT_MS = 15000L
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
@@ -35,62 +38,132 @@ class CommandService : Service() {
     private val binder = object : ICommandService.Stub() {
         override fun executeCommand(command: String, callback: ICallback?) {
             Log.d(TAG, "收到命令执行请求: $command")
+
             serviceScope.launch {
+                // 使用互斥锁防止并发冲突
                 commandMutex.withLock {
-                    Log.d(TAG, "开始执行命令: $command")
                     var process: Process? = null
                     try {
-                        process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
-                        
-                        val output = StringBuilder()
-                        val error = StringBuilder()
-                        
-                        val outputJob = launch {
-                            process?.inputStream?.bufferedReader()?.use { reader ->
-                                reader.forEachLine { line ->
-                                    output.append(line).append("\n")
+                        // 🔥 核心修改：使用 withTimeout 包裹代码块，实现真正的超时控制
+                        withTimeout(COMMAND_TIMEOUT_MS) {
+                            Log.d(TAG, "开始执行命令: $command")
+
+                            // 1. 尝试创建进程 (优先 Root，降级 Shizuku)
+                            process = createProcess(command)
+
+                            if (process == null) {
+                                throw IOException("无法获取 Root 权限或 Shizuku 服务未运行")
+                            }
+
+                            val output = StringBuilder()
+                            val error = StringBuilder()
+
+                            // 2. 异步读取标准输出流
+                            val outputJob = launch(Dispatchers.IO) {
+                                try {
+                                    process!!.inputStream.bufferedReader().use { reader ->
+                                        reader.forEachLine { line ->
+                                            output.append(line).append("\n")
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    // 忽略流关闭异常
                                 }
                             }
-                        }
-                        
-                        val errorJob = launch {
-                            process?.errorStream?.bufferedReader()?.use { reader ->
-                                reader.forEachLine { line ->
-                                    error.append(line).append("\n")
+
+                            // 3. 异步读取错误输出流
+                            val errorJob = launch(Dispatchers.IO) {
+                                try {
+                                    process!!.errorStream.bufferedReader().use { reader ->
+                                        reader.forEachLine { line ->
+                                            error.append(line).append("\n")
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    // 忽略流关闭异常
                                 }
                             }
-                        }
-                        
-                        outputJob.join()
-                        errorJob.join()
-                        
-                        val exitCode = process?.waitFor() ?: -1
-                        
-                        if (exitCode == 0) {
-                            Log.d(TAG, "命令执行成功: $command")
-                            callback?.onSuccess(output.toString())
-                        } else {
-                            Log.e(TAG, "命令执行失败: $command, 退出码: $exitCode, 错误: $error")
-                            callback?.onError("退出码: $exitCode, 错误: $error")
+
+                            // 4. 等待进程结束
+                            // waitFor() 会阻塞当前协程，直到进程退出
+                            // 如果卡住，外层的 withTimeout 会把它取消掉
+                            val exitCode = withContext(Dispatchers.IO) {
+                                process!!.waitFor()
+                            }
+
+                            // 等待流读取完毕
+                            outputJob.join()
+                            errorJob.join()
+
+                            if (exitCode == 0) {
+                                Log.d(TAG, "命令执行成功: $command")
+                                callback?.onSuccess(output.toString().trim())
+                            } else {
+                                Log.e(TAG, "命令执行失败: $command, 退出码: $exitCode, 错误: $error")
+                                callback?.onError("退出码: $exitCode, 错误: $error")
+                            }
                         }
                     } catch (e: TimeoutCancellationException) {
-                        Log.e(TAG, "命令执行超时: $command")
-                        process?.destroy()
+                        Log.e(TAG, "命令执行超时 (${COMMAND_TIMEOUT_MS}ms): $command")
                         callback?.onError("命令执行超时")
+                        // 超时后强制杀掉进程
+                        process?.destroy()
                     } catch (e: Exception) {
                         Log.e(TAG, "执行命令异常: $command, 错误: ${e.message}")
                         callback?.onError(e.message ?: "未知错误")
                     } finally {
-                        process?.destroy()
-                        Log.d(TAG, "命令执行完成: $command")
+                        // 确保进程资源被释放
+                        try {
+                            process?.destroy()
+                        } catch (ignored: Exception) {
+                        }
+                        Log.d(TAG, "命令执行流程结束: $command")
                     }
                 }
             }
         }
     }
 
+    /**
+     * 创建进程的辅助方法
+     * 策略：优先尝试 su (Root)，失败则尝试 Shizuku (ADB Shell)
+     */
+    private fun createProcess(command: String): Process? {
+        // 策略 1: Root (su)
+        try {
+            return Runtime.getRuntime().exec(arrayOf("su", "-c", command))
+        } catch (e: Exception) {
+            // 忽略
+        }
+        // 策略 2: Shizuku
+        if (Shizuku.pingBinder()) {
+            try {
+                val method = Shizuku::class.java.getDeclaredMethod(
+                    "newProcess",
+                    Array<String>::class.java,
+                    Array<String>::class.java,
+                    String::class.java
+                )
+                method.isAccessible = true
+                return method.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
+            } catch (e: Exception) {
+                Log.e(TAG, "Shizuku 启动失败: ${e.message}")
+                e.printStackTrace()
+            }
+        } else {
+            Log.e(TAG, "Shizuku 服务未运行或未授权")
+        }
+
+        return null
+    }
+
     override fun onBind(intent: Intent?): IBinder {
         Log.d(TAG, "CommandService 绑定")
+        // Shizuku 初始化监听（可选，防止绑定过早 Shizuku 还没准备好）
+        if (Shizuku.pingBinder()) {
+            // Shizuku 已经就绪
+            Log.i(TAG, "Shizuku 已经就绪")
+        }
         return binder
     }
 
@@ -101,6 +174,7 @@ class CommandService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        serviceScope.cancel() // 销毁时取消所有协程任务
         Log.d(TAG, "CommandService 销毁")
     }
 }

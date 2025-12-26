@@ -559,6 +559,7 @@ class AntOrchard : ModelTask() {
             // 定义两种奖励来源
             val awardSources = listOf(
                 Pair("tmall", "upgrade_tmall_exchange_task"),
+                Pair("antfarm", "ANTFARM_ORCHARD_PLUS"),
                 Pair("widget", "widget_shoufei")
             )
 

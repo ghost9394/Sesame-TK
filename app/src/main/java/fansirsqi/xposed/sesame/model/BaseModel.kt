@@ -35,6 +35,14 @@ class BaseModel : Model() {
     }
 
     override fun boot(classLoader: ClassLoader?) {
+        // 如果Root滑块或发送滑动命令广播开启，自动关闭VPN弹窗拦截
+        if (enableRootSlide.value || enableSlideBroadcast.value) {
+            if (enableCaptchaUIHook.value) {
+                enableCaptchaUIHook.value = false
+                val reason = if (enableRootSlide.value) "Root滑块" else "发送滑动命令到ShortX广播"
+                Log.record(TAG, "⚠️ ${reason}已开启，自动关闭VPN弹窗拦截")
+            }
+        }
         // 配置已加载，更新验证码Hook状态
         try {
             updateHooks(
@@ -71,6 +79,8 @@ class BaseModel : Model() {
 
         modelFields.addField(batteryPerm) //是否申请支付宝的后台运行权限
         modelFields.addField(enableCaptchaUIHook) //验证码UI层拦截
+        modelFields.addField(enableRootSlide) //是否使用Root权限滑动验证码
+        modelFields.addField(enableSlideBroadcast) //支付宝10.6.58.8000 发送滑块命令到ShortX广播
         modelFields.addField(recordLog) //是否记录record日志
         modelFields.addField(runtimeLog) //是否记录runtime日志
         modelFields.addField(showToast) //是否显示气泡提示
@@ -200,6 +210,17 @@ class BaseModel : Model() {
         @Getter
         val enableCaptchaUIHook: BooleanModelField = BooleanModelField("enableCaptchaUIHook", "🛡️拒绝访问VPN弹窗拦截", false)
 
+        /**
+         * 是否使用Root权限滑动验证码
+         */
+        @Getter
+        val enableRootSlide: BooleanModelField = BooleanModelField("enableRootSlide", "支付宝10.6.58.8000 Root滑块验证", false)
+
+        /**
+         * 是否发送滑动命令广播通知
+         */
+        @Getter
+        val enableSlideBroadcast: BooleanModelField = BooleanModelField("enableSlideBroadcast", "支付宝10.6.58.8000 发送滑块命令到ShortX广播", false)
 
         /**
          * 是否记录record日志

@@ -916,7 +916,7 @@ class AntMember : ModelTask() {
 
                         // 5. 执行兑换
                         Log.record(TAG, "准备兑换[$name], ID: $benefitId, 需积分: $pointNeeded")
-                        if (exchangeBenefit(benefitId, userId)) {
+                        if (exchangeBenefit(benefitId, itemId,userId)) {
                             Log.other("会员积分🎐兑换[$name]#花费[$pointNeeded 积分]")
                         } else {
                             Log.record(TAG, "兑换失败: $name (ItemId: $itemId)")
@@ -947,15 +947,25 @@ class AntMember : ModelTask() {
         }
     }
 
-    private fun exchangeBenefit(benefitId: String, userid: String?): Boolean {
+    private fun exchangeBenefit(benefitId: String, itemid: String, userid: String?): Boolean {
         try {
-            val jo = JSONObject(AntMemberRpcCall.exchangeBenefit(benefitId, userid))
+            val resString = AntMemberRpcCall.exchangeBenefit(benefitId, itemid, userid)
+            val jo = JSONObject(resString)
+            val resultCode = jo.optString("resultCode")
+
+            if (resultCode == "BEYOND_BUYING_TIMES") {
+                Log.record(TAG, "会员权益兑换已达上限，标记任务今日完成")
+                memberPointExchangeBenefitToday(benefitId)
+                return true
+            }
+
             if (ResChecker.checkRes(TAG + "会员权益兑换失败:", jo)) {
                 memberPointExchangeBenefitToday(benefitId)
                 return true
             }
+
         } catch (t: Throwable) {
-            Log.printStackTrace(TAG, "exchangeBenefit err:", t)
+            Log.printStackTrace(TAG, "exchangeBenefit 错误:", t)
         }
         return false
     }

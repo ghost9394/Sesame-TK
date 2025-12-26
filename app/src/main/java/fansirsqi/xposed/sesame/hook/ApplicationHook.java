@@ -515,6 +515,9 @@ public class ApplicationHook {
                     // SecurityBodyHelper初始化
                     SecurityBodyHelper.INSTANCE.init(classLoader);
 
+                    //LOG日志的初始化
+                    Log.init(appContext);
+
 
                     // ✅ 优先使用 Hook 捕获的版本号
                     if (VersionHook.hasVersion()) {
@@ -549,23 +552,29 @@ public class ApplicationHook {
                         Log.runtime(TAG, "✅ 已对版本 10.7.26.8100 进行特殊处理");
                     }
 
-                    if (VersionHook.hasVersion() && "10.6.58.8000".equals(alipayVersion.getVersionString())) {
-                        // 启用SimplePageManager窗口监控
-                        SimplePageManager.INSTANCE.enableWindowMonitoring(classLoader);
-
-
-                        // 初始化CaptchaHandler
-                        Log.runtime(TAG, "✅ 开始初始化Captcha1Handler");
-                        SimplePageManager.INSTANCE.addHandler(
-                                "com.alipay.mobile.nebulax.xriver.activity.XRiverActivity",
-                                new Captcha1Handler());
-                        SimplePageManager.INSTANCE.addHandler(
-                                "com.eg.android.AlipayGphone.AlipayLogin",
-                                new Captcha2Handler());
-                    }else {
-                        Log.debug(TAG, "当前支付宝版本不是10.6.58.8000，不支自动滑块Hook");
-                    }
-
+if (VersionHook.hasVersion() && alipayVersion.getVersionString() != null) {
+    String version = alipayVersion.getVersionString();
+    
+    // 正则表达式匹配：
+    // 1. 主版本小于10的所有版本: [0-9]\.[0-9]+\.[0-9]+\.[0-9]+
+    // 2. 10.0.x.x 到 10.5.x.x: 10\.[0-5]\.[0-9]+\.[0-9]+
+    // 3. 10.6.0.x 到 10.6.58.x: 10\.6\.([0-9]|[0-4][0-9]|5[0-8])\.[0-9]+
+    if (version.matches("^([0-9]\\.[0-9]+\\.[0-9]+\\.[0-9]+|10\\.[0-5]\\.[0-9]+\\.[0-9]+|10\\.6\\.([0-9]|[0-4][0-9]|5[0-8])\\.[0-9]+)$")) {
+        // 启用SimplePageManager窗口监控
+        SimplePageManager.INSTANCE.enableWindowMonitoring(classLoader);
+        
+        // 初始化CaptchaHandler
+        Log.runtime(TAG, "✅ 开始初始化CaptchaHandler，版本: " + version);
+        SimplePageManager.INSTANCE.addHandler(
+                "com.alipay.mobile.nebulax.xriver.activity.XRiverActivity",
+                new Captcha1Handler());
+        SimplePageManager.INSTANCE.addHandler(
+                "com.eg.android.AlipayGphone.AlipayLogin",
+                new Captcha2Handler());
+    } else {
+        Log.debug(TAG, "当前支付宝版本 " + version + " 不支持自动滑块Hook");
+    }
+}
 
                     if (BuildConfig.DEBUG) {
                         try {
@@ -1107,7 +1116,7 @@ public class ApplicationHook {
      * @param action   广播动作
      * @param errorMsg 错误日志消息
      */
-    private static void sendBroadcast(String action, String errorMsg) {
+    public static void sendBroadcast(String action, String errorMsg) {
         try {
             appContext.sendBroadcast(new Intent(action));
         } catch (Throwable th) {
@@ -1115,7 +1124,15 @@ public class ApplicationHook {
             Log.printStackTrace(TAG, th);
         }
     }
-
+    /**
+     * 发送广播到其他应用（显式广播）
+     * @param message 要发送的字符串消息
+     */
+    public static void sendBroadcastShell(String API,String message) {
+        Intent intent = new Intent("fansirsqi.xposed.sesame.SHELL");
+        intent.putExtra(API, message);
+        appContext.sendBroadcast(intent,null);
+    }
     /**
      * 通过广播发送重新登录的指令
      */

@@ -371,6 +371,7 @@ public class AntMemberRpcCall {
      * @param userId    userId（用户ID，格式如）
      * @return 接口请求结果
      */
+    /*
     public static String exchangeBenefit(String benefitId, String userId) {
         // 1. 生成请求ID（前缀+当前毫秒时间戳）
         String requestId = "requestId" + System.currentTimeMillis();
@@ -387,6 +388,59 @@ public class AntMemberRpcCall {
                 userId,
                 System.currentTimeMillis());
         // 5. 发起接口请求并返回结果
+        return RequestManager.requestString("com.alipay.alipaymember.biz.rpc.exchange.h5.exchangeBenefit", data);
+    }*/
+
+    public static String exchangeBenefit(String benefitId, String itemId, String userId) {
+        long now = System.currentTimeMillis();
+
+        // 1. 生成请求ID
+        String requestId = "requestId" + now;
+
+        // 2. 生成唯一unid (UUID)
+        String unid = UUID.randomUUID().toString();
+
+        // 3. 生成 uniqueId (通常是 userId + 时间戳，或者直接是 userId)
+        // 根据你提供的 JSON，这里似乎直接是 userId 拼接了一个标记或时间戳
+        String uniqueId = userId + now;
+
+        // 4. 拼接 requestSourceInfo
+        String requestSourceInfo = String.format("SID:%s|0", uniqueId);
+
+        // 5. 构建符合最新结构的 JSON 数据
+        // 注意：增加了 itemId, cityCode, miniAppId 等字段
+        String data = String.format("[" +
+                        "{" +
+                        "\"benefitId\":\"%s\"," +
+                        "\"cityCode\":\"\"," +
+                        "\"exchangeType\":\"POINT_PAY\"," +
+                        "\"itemId\":\"%s\"," +
+                        "\"miniAppId\":\"\"," +
+                        "\"orderSource\":\"\"," +
+                        "\"requestId\":\"%s\"," +
+                        "\"requestSourceInfo\":\"%s\"," +
+                        "\"sourcePassMap\":{" +
+                        "\"alipayClientVersion\":\"10.7.80.8000\"," +
+                        "\"bid\":\"\"," +
+                        "\"feedsIndex\":\"0\"," +
+                        "\"innerSource\":\"a159.b52659\"," +
+                        "\"isCpc\":\"\"," +
+                        "\"mobileOsType\":\"Android\"," +
+                        "\"source\":\"\"," +
+                        "\"unid\":\"%s\"," +
+                        "\"uniqueId\":\"%s\"" +
+                        "}," +
+                        "\"userOutAccount\":\"\"" +
+                        "}" +
+                        "]",
+                benefitId,
+                itemId,
+                requestId,
+                requestSourceInfo,
+                unid,
+                uniqueId);
+
+        // 6. 发起接口请求
         return RequestManager.requestString("com.alipay.alipaymember.biz.rpc.exchange.h5.exchangeBenefit", data);
     }
 

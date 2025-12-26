@@ -1,5 +1,7 @@
 package fansirsqi.xposed.sesame.util;
 
+import android.content.Context;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +33,6 @@ public class Log {
     private static final int MAX_DUPLICATE_ERRORS = 3; // 最多打印3次相同错误
 
     static {
-        Logback.configureLogbackDirectly();
         RUNTIME_LOGGER = LoggerFactory.getLogger("runtime");
         SYSTEM_LOGGER = LoggerFactory.getLogger("system");
         RECORD_LOGGER = LoggerFactory.getLogger("record");
@@ -42,6 +43,16 @@ public class Log {
         ERROR_LOGGER = LoggerFactory.getLogger("error");
         CAPTURE_LOGGER = LoggerFactory.getLogger("capture");
         CAPTCHA_LOGGER = LoggerFactory.getLogger("captcha");
+    }
+
+    // 🔥 修改点 2：新增初始化方法
+    public static void init(Context context) {
+        try {
+            // 在这里传入 context 进行配置
+            Logback.configureLogbackDirectly(context);
+        } catch (Exception e) {
+            android.util.Log.e("SesameLog", "Logback init failed", e);
+        }
     }
 
     private static String truncateLogmsg(String msg) {

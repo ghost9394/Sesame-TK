@@ -846,7 +846,6 @@ public class AntOcean extends ModelTask {
                     }
                     String str = "保护海洋生态🏖️[" + itemName + "]#第" + appliedTimes + "次" + "-获得奖励" + award;
                     Log.forest(str);
-                    GlobalThreadPools.sleepCompat(300);
                 } else {
                     Log.error("保护海洋生态🏖️[" + itemName + "]#发生未知错误,停止申请");
                     break;
