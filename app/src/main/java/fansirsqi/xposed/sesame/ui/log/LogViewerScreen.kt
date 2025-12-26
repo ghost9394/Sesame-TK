@@ -101,7 +101,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import fansirsqi.xposed.sesame.ui.theme.LogViewerTheme
+import fansirsqi.xposed.sesame.ui.theme.BaseTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -114,7 +114,7 @@ fun LogViewerScreen(
     onBackClick: () -> Unit,
     viewModel: LogViewerViewModel = viewModel()
 ) {
-    LogViewerTheme {
+    BaseTheme {
         val context = LocalContext.current
         val state by viewModel.uiState.collectAsState()
         val floatValue by viewModel.fontSize.collectAsState()

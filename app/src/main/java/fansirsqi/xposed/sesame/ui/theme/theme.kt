@@ -16,7 +16,7 @@ import androidx.core.view.WindowCompat
 import fansirsqi.xposed.sesame.R
 
 @Composable
-fun LogViewerTheme(
+fun BaseTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {

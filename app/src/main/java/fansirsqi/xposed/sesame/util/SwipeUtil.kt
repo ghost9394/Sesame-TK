@@ -18,7 +18,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 滑动操作工具类
- * 通过 AIDL 调用 CommandService 执行 root/shizuku 命令
+ * 通过 AIDL 调用 CommandService 执行 Shizuku 命令
  */
 object SwipeUtil {
 
@@ -26,9 +26,12 @@ object SwipeUtil {
     private const val DEFAULT_DURATION = 500L
     private const val TIMEOUT_MS = 10000L
     private const val ACTION_BIND = "fansirsqi.xposed.sesame.action.BIND_COMMAND_SERVICE"
+    private const val BIND_TIMEOUT_MS = 2000L
 
     private var commandService: ICommandService? = null
     private var isBound = false
+    private var lastBindAttemptTime = 0L
+    private var lastBindSuccess = false
 
     // 修复 1: 改为 var 并设为可空，每次绑定时重建
     private var connectionDeferred: CompletableDeferred<Unit>? = null
@@ -54,99 +57,48 @@ object SwipeUtil {
 
     /**
      * 绑定服务（同步等待连接完成）
+     * 优化：缓存绑定结果，避免重复等待
      */
     private suspend fun bindService(context: Context): Boolean = withContext(Dispatchers.IO) {
         if (isBound && commandService != null) {
             return@withContext true
         }
-
+        
+        val currentTime = System.currentTimeMillis()
+        if (lastBindAttemptTime > 0 && (currentTime - lastBindAttemptTime) < 30000L && !lastBindSuccess) {
+            Log.d(TAG, "30秒内已尝试绑定失败，跳过本次绑定")
+            return@withContext false
+        }
+        
+        lastBindAttemptTime = currentTime
+        
         try {
-            // 修复: 每次尝试绑定前重置 Deferred
             connectionDeferred = CompletableDeferred()
-
             val intent = Intent(ACTION_BIND)
             intent.setPackage("fansirsqi.xposed.sesame")
-
-            // 修复 2: 强制使用 Application Context 绑定，防止 Activity 内存泄漏
             val result = context.applicationContext.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-            Log.d(TAG, "绑定服务结果: $result")
-
+            Log.d(TAG, "绑定服务结果: $result" + "请启动Sesame-TK")
             if (!result) {
+                lastBindSuccess = false
                 return@withContext false
             }
-
-            // 等待服务连接完成，最多等待5秒
-            val connected = withTimeoutOrNull(5000) {
+            val connected = withTimeoutOrNull(BIND_TIMEOUT_MS) {
                 connectionDeferred?.await()
             }
+            lastBindSuccess = (connected != null)
             connected != null
         } catch (e: Exception) {
             Log.e(TAG, "绑定服务失败: ${e.message}")
+            lastBindSuccess = false
             false
         }
-    }
-
-    /**
-     * 执行命令核心方法
-     */
-    private suspend fun execCommand(context: Context, command: String, needOutput: Boolean): String = withContext(Dispatchers.IO) {
-        if (!bindService(context)) {
-            Log.e(TAG, "无法绑定 CommandService")
-            return@withContext ""
-        }
-
-        val service = commandService
-        if (service == null) {
-            Log.e(TAG, "CommandService 未连接")
-            return@withContext ""
-        }
-
-        val deferred = CompletableDeferred<String>()
-
-        val callback = object : ICallback.Stub() {
-            override fun onSuccess(output: String) {
-                // Log.d(TAG, "命令执行成功")
-                deferred.complete(output)
-            }
-
-            override fun onError(error: String) {
-                Log.e(TAG, "命令执行失败: $command, 错误: $error")
-                deferred.complete("") // 失败返回空字符串或者根据需求抛异常
-            }
-        }
-
-        try {
-            service.executeCommand(command, callback)
-            withTimeoutOrNull(TIMEOUT_MS) {
-                deferred.await()
-            } ?: ""
-        } catch (e: RemoteException) {
-            Log.e(TAG, "执行命令异常: $command, 错误: ${e.message}")
-            ""
-        } catch (e: Exception) {
-            Log.e(TAG, "执行命令超时或异常: $command, 错误: ${e.message}")
-            ""
-        }
-    }
-
-    /**
-     * 执行命令并返回布尔值（成功/失败）
-     */
-    private suspend fun execRootCommand(context: Context, command: String): Boolean {
-        // 调用通用方法，稍微判断一下逻辑（这里简化处理，没报错就算成功）
-        // 实际上 CommandService 的 callback.onSuccess 调用了就算成功
-        val result = execCommand(context, command, false)
-        // 注意：这里逻辑稍微有点变动，因为 execCommand 失败返回空串。
-        // 但对于 input swipe 这种命令，成功了输出也是空串。
-        // 所以只要没抛异常走到这里，基本就是成功的。为了严谨可以改 Service 返回特定的 ACK，但目前这样也够用。
-        return true
     }
 
     // 你原来的 execRootCommand 逻辑是用 Boolean Deferred，这里为了复用 execCommand 可以简单适配一下：
     // 其实你原来的写法也可以，只要加上上面的 bindService 修复即可。
     // 下面保留你原来的写法逻辑，只应用 bindService 的修复：
 
-    private suspend fun execRootCommandOriginal(context: Context, command: String): Boolean = withContext(Dispatchers.IO) {
+    private suspend fun execShizukuCommandOriginal(context: Context, command: String): Boolean = withContext(Dispatchers.IO) {
         if (!bindService(context)) return@withContext false
         val service = commandService ?: return@withContext false
 
@@ -164,37 +116,34 @@ object SwipeUtil {
         } catch (e: Exception) { false }
     }
 
-    suspend fun execRootCommandWithOutput(context: Context, command: String): String {
-        return execCommand(context, command, true)
-    }
-
     /**
      * 执行滑动操作
+     * @param context 上下文
+     * @param startX 起始X坐标
+     * @param startY 起始Y坐标
+     * @param endX 结束X坐标
+     * @param endY 结束Y坐标
+     * @param duration 滑动持续时间
+     * @return true表示成功，false表示失败
      */
     suspend fun swipe(context: Context, startX: Int, startY: Int, endX: Int, endY: Int, duration: Long = DEFAULT_DURATION): Boolean = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "执行滑动: ($startX, $startY) -> ($endX, $endY), 耗时: ${duration}ms")
             val command = "input swipe $startX $startY $endX $endY $duration"
-
-            // 使用修复后的绑定逻辑
-            val result = execRootCommandOriginal(context, command)
-
+            
+            val result = execShizukuCommandOriginal(context, command)
             if (result) {
                 Log.d(TAG, "滑动命令发送成功")
                 delay(duration + 200)
+                true
             } else {
-                Log.e(TAG, "滑动失败")
+                Log.e(TAG, "滑动操作失败,Sesame-TK后台已关闭")
+                false
             }
-            result
         } catch (e: Exception) {
-            Log.e(TAG, "滑动操作失败: ${e.message}")
+            Log.e(TAG, "滑动操作异常: ${e.message}")
             false
         }
-    }
-
-    suspend fun swipe(context: Context, path: IntArray, duration: Long = DEFAULT_DURATION): Boolean {
-        if (path.size < 4) return false
-        return swipe(context, path[0], path[1], path[2], path[3], duration)
     }
 
     @JvmStatic

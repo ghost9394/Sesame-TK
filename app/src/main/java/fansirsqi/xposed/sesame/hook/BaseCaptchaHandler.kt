@@ -2,7 +2,6 @@ package fansirsqi.xposed.sesame.hook
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.Context
 import fansirsqi.xposed.sesame.hook.simple.SimplePageManager
 import fansirsqi.xposed.sesame.hook.simple.SimpleViewImage
 import fansirsqi.xposed.sesame.model.BaseModel
@@ -10,8 +9,6 @@ import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.util.GlobalThreadPools.sleepCompat
 import fansirsqi.xposed.sesame.util.Log
 import fansirsqi.xposed.sesame.util.SwipeUtil
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /**
  * 滑动路径数据类 - 封装滑动验证码的路径信息
@@ -45,7 +42,7 @@ abstract class BaseCaptchaHandler {
         // 滑动持续时间（毫秒）
         private const val SLIDE_DURATION = 500L
         // 最大滑动重试次数
-        private const val MAX_SLIDE_RETRIES = 4
+        private const val MAX_SLIDE_RETRIES = 2
         // 滑动重试间隔时间（毫秒）
         private const val SLIDE_RETRY_INTERVAL = 500L
 
@@ -66,6 +63,7 @@ abstract class BaseCaptchaHandler {
      */
     open suspend fun handleActivity(activity: Activity, root: SimpleViewImage): Boolean {
         try {
+
             if (handleSlideCaptcha(activity, root)) {
                 return true
             }
@@ -96,28 +94,14 @@ abstract class BaseCaptchaHandler {
 
             // logSlideInfo(activity, slideRect, slidePath)
 
-            if (!BaseModel.enableRootSlide.value) {
-                Log.captcha(TAG, "Sesame-TK Root滑块功能已关闭，跳过Root滑动")
-            } else {
-                val hasRootPermission = checkRootPermission(activity)
-                if (hasRootPermission) {
-                    saveSlidePathIfNeeded(slidePath) // 保存滑动路径到 DataStore
-                    executeSlideWithRetry(activity, root, slidePath) // 执行滑动并重试
-                } else {
-                    Log.captcha(TAG, "无Sesame-TK Root 权限，跳过保存滑动路径")
-                }
-            }
-
-            // 发送广播通知滑动路径
-            if (BaseModel.enableSlideBroadcast.value) {
+            if (!BaseModel.enableSlide.value) {
+                Log.captcha(TAG, "Sesame-TK 滑块验证功能已关闭，使用ShortX广播方式滑动")
                 ApplicationHook.sendBroadcastShell(
                     getSlidePathKey(),
                     "input swipe " + slidePath.toIntArray().joinToString(" ")
                 )
-                saveSlidePathIfNeeded(slidePath)
-
             } else {
-                Log.captcha(TAG, "滑动路径广播功能已关闭")
+                executeSlideWithRetry(activity, root, slidePath)
             }
 
             true
@@ -169,25 +153,25 @@ abstract class BaseCaptchaHandler {
         Log.captcha(TAG, "滑动路径: (${slidePath.startX}, ${slidePath.startY}) -> (${slidePath.endX}, ${slidePath.endY})")
     }
 
-    /**
-     * 保存滑动路径到 DataStore（仅在路径变化时保存）
-     * @param slidePath 要保存的滑动路径
-     */
-    private fun saveSlidePathIfNeeded(slidePath: SlidePath) {
-        try {
-            val slidePathArray = slidePath.toIntArray()
-            val slidePathKey = getSlidePathKey()
-            val existingPath = DataStore.get(slidePathKey, IntArray::class.java)
-
-            if (existingPath == null || !existingPath.contentEquals(slidePathArray)) {
-                DataStore.put(slidePathKey, slidePathArray)
-                Log.captcha(TAG, "滑动路径已保存到DataStore: [${slidePathArray.joinToString(", ")}]")
-            }
-            Log.captcha(TAG, "路径数据: [${slidePathArray.joinToString(", ")}]")
-        } catch (e: Exception) {
-            Log.captcha(TAG, "保存滑动路径到DataStore失败: ${e.message}")
-        }
-    }
+//    /**
+//     * 保存滑动路径到 DataStore（仅在路径变化时保存）
+//     * @param slidePath 要保存的滑动路径
+//     */
+//    private fun saveSlidePathIfNeeded(slidePath: SlidePath) {
+//        try {
+//            val slidePathArray = slidePath.toIntArray()
+//            val slidePathKey = getSlidePathKey()
+//            val existingPath = DataStore.get(slidePathKey, IntArray::class.java)
+//
+//            if (existingPath == null || !existingPath.contentEquals(slidePathArray)) {
+//                DataStore.put(slidePathKey, slidePathArray)
+//                Log.captcha(TAG, "滑动路径已保存到DataStore: [${slidePathArray.joinToString(", ")}]")
+//            }
+//            Log.captcha(TAG, "路径数据: [${slidePathArray.joinToString(", ")}]")
+//        } catch (e: Exception) {
+//            Log.captcha(TAG, "保存滑动路径到DataStore失败: ${e.message}")
+//        }
+//    }
 
     /**
      * 执行滑动操作并重试
@@ -197,6 +181,9 @@ abstract class BaseCaptchaHandler {
      * @return true 表示滑动成功，false 表示滑动失败
      */
     private suspend fun executeSlideWithRetry(activity: Activity, root: SimpleViewImage, slidePath: SlidePath): Boolean {
+        val api = getSlidePathKey()
+        val command = "input swipe ${slidePath.startX} ${slidePath.startY} ${slidePath.endX} ${slidePath.endY} $SLIDE_DURATION"
+        var broadcastSent = false
         repeat(MAX_SLIDE_RETRIES) { retry ->
             Log.captcha(TAG, "========== 第 ${retry + 1} 次尝试滑动 ==========")
             val swipeSuccess = SwipeUtil.swipe(
@@ -207,12 +194,12 @@ abstract class BaseCaptchaHandler {
                 slidePath.endY,
                 SLIDE_DURATION
             )
-          //  ApplicationHook.sendBroadcast("fansirsqi.xposed.sesame.ACTION_SLIDE_EXECUTED","input swipe 205 1587 1172 1587 500")
+
             if (swipeSuccess) {
                 Log.captcha(TAG, "滑动操作执行成功，等待验证码文本消失...")
                 sleepCompat(2500)
                 Log.captcha(TAG, "开始检测验证码文本...")
-                if (checkCaptchaTextGone(root)) {
+                if (checkCaptchaTextGone()) {
                     Log.captcha(TAG, "验证码文本已消失，滑动成功")
                     return true
                 } else {
@@ -220,8 +207,13 @@ abstract class BaseCaptchaHandler {
                 }
             } else {
                 Log.captcha(TAG, "滑动操作执行失败，准备重试...")
+                if (!broadcastSent) {
+                    Log.captcha(TAG, "发送广播到 ShortX...")
+                    ApplicationHook.sendBroadcastShell(api, command)
+                    broadcastSent = true
+                }
             }
-            
+
             if (retry < MAX_SLIDE_RETRIES - 1) {
                 sleepCompat(SLIDE_RETRY_INTERVAL)
             }
@@ -236,7 +228,7 @@ abstract class BaseCaptchaHandler {
      * @param root 根视图
      * @return true 表示文本已消失，false 表示文本仍然存在
      */
-    private fun checkCaptchaTextGone(root: SimpleViewImage): Boolean {
+    private fun checkCaptchaTextGone(): Boolean {
         val slideTextInDialog = findSlideTextInDialog()
         if (slideTextInDialog == null) {
             Log.captcha(TAG, "验证码文本已消失（Dialog 中未找到）")
@@ -259,25 +251,6 @@ abstract class BaseCaptchaHandler {
         }
     }
 
-    /**
-     * 检测 Root 权限
-     * @param context 上下文
-     * @return 是否有 Root 权限
-     */
-    private suspend fun checkRootPermission(context: Context): Boolean = withContext(Dispatchers.IO) {
-        try {
-            val output = SwipeUtil.execRootCommandWithOutput(context, "id")
-            val hasRoot = output.contains("uid=0")
-            if (hasRoot) {
-                Log.captcha(TAG, "Root 权限检测成功")
-            } else {
-                Log.captcha(TAG, "Root 权限检测失败，输出: $output")
-            }
-            hasRoot
-        } catch (e: Exception) {
-            Log.captcha(TAG, "Root 权限检测异常: ${e.message}")
-            false
-        }
-    }
+
 
 }

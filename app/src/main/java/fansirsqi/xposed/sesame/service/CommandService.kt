@@ -21,7 +21,7 @@ import java.io.IOException
 
 /**
  * 命令执行服务
- * 支持 Root (su) 和 Shizuku (adb shell)
+ * 使用 Shizuku (adb shell) 执行命令
  */
 class CommandService : Service() {
 
@@ -48,11 +48,11 @@ class CommandService : Service() {
                         withTimeout(COMMAND_TIMEOUT_MS) {
                             Log.d(TAG, "开始执行命令: $command")
 
-                            // 1. 尝试创建进程 (优先 Root，降级 Shizuku)
+                            // 1. 尝试创建进程 (Shizuku)
                             process = createProcess(command)
 
                             if (process == null) {
-                                throw IOException("无法获取 Root 权限或 Shizuku 服务未运行")
+                                throw IOException("Shizuku 服务未运行")
                             }
 
                             val output = StringBuilder()
@@ -126,32 +126,26 @@ class CommandService : Service() {
 
     /**
      * 创建进程的辅助方法
-     * 策略：优先尝试 su (Root)，失败则尝试 Shizuku (ADB Shell)
+     * 使用 Shizuku (ADB Shell) 执行命令
      */
     private fun createProcess(command: String): Process? {
-        // 策略 1: Root (su)
-        try {
-            return Runtime.getRuntime().exec(arrayOf("su", "-c", command))
-        } catch (e: Exception) {
-            // 忽略
-        }
-        // 策略 2: Shizuku
-        if (Shizuku.pingBinder()) {
-            try {
-                val method = Shizuku::class.java.getDeclaredMethod(
-                    "newProcess",
-                    Array<String>::class.java,
-                    Array<String>::class.java,
-                    String::class.java
-                )
-                method.isAccessible = true
-                return method.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
-            } catch (e: Exception) {
-                Log.e(TAG, "Shizuku 启动失败: ${e.message}")
-                e.printStackTrace()
-            }
-        } else {
+        if (!Shizuku.pingBinder()) {
             Log.e(TAG, "Shizuku 服务未运行或未授权")
+            return null
+        }
+
+        try {
+            val method = Shizuku::class.java.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java
+            )
+            method.isAccessible = true
+            return method.invoke(null, arrayOf("sh", "-c", command), null, null) as Process
+        } catch (e: Exception) {
+            Log.e(TAG, "Shizuku 启动失败: ${e.message}")
+            e.printStackTrace()
         }
 
         return null

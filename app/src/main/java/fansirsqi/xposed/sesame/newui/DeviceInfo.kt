@@ -184,16 +184,11 @@ object DeviceInfoUtil {
 
     suspend fun showInfo(vid: String, context: Context): Map<String, String> = withContext(Dispatchers.IO) {
         // 1. 获取设备属性的方法
-        fun getProp(prop: String): String {
-            return try {
-                val p = Runtime.getRuntime().exec("getprop $prop")
-                p.inputStream.bufferedReader().readLine() ?: ""
-            } catch (_: Exception) {
-                ""
-            }
+        suspend fun getProp(prop: String): String {
+            return execCommand(context, "getprop $prop").trim()
         }
 
-        fun getDeviceName(): String {
+        suspend fun getDeviceName(): String {
             val candidates = listOf("ro.product.marketname", "ro.product.model")
             for (prop in candidates) {
                 val value = getProp(prop)
@@ -210,16 +205,11 @@ object DeviceInfoUtil {
 
         // 4. 生成权限状态字符串
         val permissionStatus = when {
-            // 如果 id 命令返回 uid=0，说明正在使用 Root
-            idOutput.contains("uid=0") -> {
-                //ROOT与Shizuku二选一即可
-                if (shizukuAvailable) "Root or Shizuku ✔" else "Root ✔"
-            }
             // 如果 id 命令返回 uid=2000 或 shell，说明正在使用 Shizuku
             idOutput.contains("uid=2000") || idOutput.contains("shell") -> "Shizuku (Shell) ✓"
             // 否则就是没权限
             else -> {
-                if (shizukuAvailable) "Shizuku Ready ✔" else "未授权滑块服务 ❌"
+                if (shizukuAvailable) "Shizuku  ✔" else "未授权滑块服务 ❌"
             }
         }
 
