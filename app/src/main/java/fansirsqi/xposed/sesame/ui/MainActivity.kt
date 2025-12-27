@@ -324,9 +324,9 @@ fun MainScreen(
         // 异步加载设备信息，启动后自动更新3次
         val deviceInfoMap by produceState<Map<String, String>?>(initialValue = null) {
             value = DeviceInfoUtil.showInfo(verifyId, context)
-            // 启动后自动更新3次（每次间隔2秒）
-            repeat(3) {
-                kotlinx.coroutines.delay(500)
+
+            repeat(1) {
+                kotlinx.coroutines.delay(200)
                 value = DeviceInfoUtil.showInfo(verifyId, context)
             }
         }

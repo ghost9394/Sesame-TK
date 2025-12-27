@@ -12,10 +12,11 @@ import android.os.Looper;
 
 import androidx.annotation.NonNull;
 
+import fansirsqi.xposed.sesame.hook.internal.SecurityBodyHelper;
 import fansirsqi.xposed.sesame.hook.keepalive.SmartSchedulerManager;
 import fansirsqi.xposed.sesame.hook.server.ModuleHttpServerManager;
 import fansirsqi.xposed.sesame.hook.simple.SimplePageManager;
-import fansirsqi.xposed.sesame.hook.call.LocationHelper;
+import fansirsqi.xposed.sesame.hook.internal.LocationHelper;
 import kotlin.Unit;
 import lombok.Setter;
 

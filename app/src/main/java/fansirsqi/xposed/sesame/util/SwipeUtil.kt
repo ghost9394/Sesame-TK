@@ -94,11 +94,9 @@ object SwipeUtil {
         }
     }
 
-    // 你原来的 execRootCommand 逻辑是用 Boolean Deferred，这里为了复用 execCommand 可以简单适配一下：
-    // 其实你原来的写法也可以，只要加上上面的 bindService 修复即可。
-    // 下面保留你原来的写法逻辑，只应用 bindService 的修复：
 
-    private suspend fun execShizukuCommandOriginal(context: Context, command: String): Boolean = withContext(Dispatchers.IO) {
+
+    suspend fun execShizukuCommandOriginal(context: Context, command: String): Boolean = withContext(Dispatchers.IO) {
         Log.d(TAG, "准备执行命令: $command")
         if (!bindService(context)) {
             Log.e(TAG, "绑定服务失败，无法执行命令")

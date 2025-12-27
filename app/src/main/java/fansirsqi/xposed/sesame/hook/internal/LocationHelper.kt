@@ -1,4 +1,4 @@
-package fansirsqi.xposed.sesame.hook.call
+package fansirsqi.xposed.sesame.hook.internal
 
 import de.robv.android.xposed.XposedHelpers
 import org.json.JSONObject

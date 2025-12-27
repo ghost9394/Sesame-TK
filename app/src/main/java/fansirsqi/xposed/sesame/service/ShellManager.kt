@@ -29,7 +29,12 @@ class ShellManager(context: Context) {
 
     private suspend fun selectExecutor() {
         selectedShell = executors.firstOrNull {
-            it.isAvailable()
+            try {
+                it.isAvailable()
+            } catch (e: Exception) {
+                Log.d(TAG, "Shell ${it.javaClass.simpleName} 不可用: ${e.message}")
+                false
+            }
         }
         Log.d(TAG, "选择的 Shell: $selectedName")
     }

@@ -217,7 +217,6 @@ object DeviceInfoUtil {
         val currentShellType = getCurrentShellType(context)
 
         // 3. 判断 Shizuku 服务是否可用（辅助信息）
-        val shizukuAvailable = isShizukuAvailable(context)
 
         // 4. 生成权限状态字符串
         val permissionStatus = when (currentShellType) {

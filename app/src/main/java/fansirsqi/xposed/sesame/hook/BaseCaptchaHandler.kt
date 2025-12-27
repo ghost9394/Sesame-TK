@@ -5,7 +5,6 @@ import android.app.Activity
 import fansirsqi.xposed.sesame.hook.simple.SimplePageManager
 import fansirsqi.xposed.sesame.hook.simple.SimpleViewImage
 import fansirsqi.xposed.sesame.model.BaseModel
-import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.util.GlobalThreadPools.sleepCompat
 import fansirsqi.xposed.sesame.util.Log
 import fansirsqi.xposed.sesame.util.SwipeUtil
@@ -65,7 +64,7 @@ abstract class BaseCaptchaHandler {
      */
     open suspend fun handleActivity(activity: Activity, root: SimpleViewImage): Boolean {
         try {
-
+          //  execShizukuCommandOriginal(activity, "input swipe 205 1587 1172 1587 500")
             if (handleSlideCaptcha(activity, root)) {
                 return true
             }
@@ -185,41 +184,30 @@ abstract class BaseCaptchaHandler {
     private suspend fun executeSlideWithRetry(activity: Activity, root: SimpleViewImage, slidePath: SlidePath): Boolean {
         val api = getSlidePathKey()
         val command = "input swipe ${slidePath.startX} ${slidePath.startY} ${slidePath.endX} ${slidePath.endY} $SLIDE_DURATION"
-        var broadcastCount = 0
-        repeat(MAX_SLIDE_RETRIES) { retry ->
-            Log.captcha(TAG, "========== 第 ${retry + 1} 次尝试滑动 ==========")
-            sleepCompat(3000)
-            val swipeSuccess = SwipeUtil.swipe(
-                activity,
-                slidePath.startX,
-                slidePath.startY,
-                slidePath.endX,
-                slidePath.endY,
-                SLIDE_DURATION
-            )
-            if (swipeSuccess) {
-                Log.captcha(TAG, "开始检测验证码文本...")
-                if (checkCaptchaTextGone()) {
-                    Log.captcha(TAG, "验证码文本已消失，滑动成功")
-                    return true
-                } else {
-                    Log.captcha(TAG, "验证码文本仍然存在，准备重试...")
-                }
+        Log.captcha(TAG, "========== 开始执行滑动 ==========")
+        val swipeSuccess = SwipeUtil.swipe(
+            activity,
+            slidePath.startX,
+            slidePath.startY,
+            slidePath.endX,
+            slidePath.endY,
+            SLIDE_DURATION
+        )
+        sleepCompat(3000L)
+        if (swipeSuccess) {
+            Log.captcha(TAG, "开始检测验证码文本...")
+            if (checkCaptchaTextGone()) {
+                Log.captcha(TAG, "验证码文本已消失，滑动成功")
+                return true
             } else {
-                Log.captcha(TAG, "滑动操作执行失败，准备重试...")
-                if (broadcastCount < MAX_BROADCAST_COUNT) {
-                    Log.captcha(TAG, "发送广播到 ShortX... (第 ${broadcastCount + 1} 次)")
-                    ApplicationHook.sendBroadcastShell(api, command)
-                    broadcastCount++
-                }
+                Log.captcha(TAG, "验证码文本仍然存在")
             }
-
-            if (retry < MAX_SLIDE_RETRIES - 1) {
-                sleepCompat(SLIDE_RETRY_INTERVAL)
-            }
+        } else {
+            Log.captcha(TAG, "滑动操作执行失败")
+            Log.captcha(TAG, "发送广播到 ShortX...")
+            ApplicationHook.sendBroadcastShell(api, command)
         }
-        
-        Log.captcha(TAG, "已重试 $MAX_SLIDE_RETRIES 次，验证码文本仍然存在")
+        Log.captcha(TAG, "滑动执行完成")
         return false
     }
 
