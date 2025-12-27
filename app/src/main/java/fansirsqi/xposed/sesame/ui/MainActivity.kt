@@ -321,9 +321,14 @@ fun MainScreen(
         // 控制下拉菜单显示
         var showMenu by remember { mutableStateOf(false) }
 
-        // 异步加载设备信息
+        // 异步加载设备信息，启动后自动更新3次
         val deviceInfoMap by produceState<Map<String, String>?>(initialValue = null) {
             value = DeviceInfoUtil.showInfo(verifyId, context)
+            // 启动后自动更新3次（每次间隔2秒）
+            repeat(3) {
+                kotlinx.coroutines.delay(500)
+                value = DeviceInfoUtil.showInfo(verifyId, context)
+            }
         }
 
         Scaffold(

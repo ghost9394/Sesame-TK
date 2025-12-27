@@ -36,10 +36,13 @@ object LocationHelper {
                 val lnsctrUtilsClass = XposedHelpers.findClass("com.alipay.mobile.common.lnsctr.LnsctrUtils", classLoader)
                 val latitude = XposedHelpers.callStaticMethod(lnsctrUtilsClass, "getLatitude") as? Double
                 val longitude = XposedHelpers.callStaticMethod(lnsctrUtilsClass, "getLongitude") as? Double
+                val cityCode = XposedHelpers.callStaticMethod(lnsctrUtilsClass, "getAdcode") as? String
+                
                 cachedLocation = if (latitude != null && longitude != null) {
                     JSONObject().apply {
                         put("latitude", latitude)
                         put("longitude", longitude)
+                        put("cityCode", cityCode)
                     }
                 } else {
                     JSONObject().apply {

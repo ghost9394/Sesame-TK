@@ -99,21 +99,39 @@ object SwipeUtil {
     // 下面保留你原来的写法逻辑，只应用 bindService 的修复：
 
     private suspend fun execShizukuCommandOriginal(context: Context, command: String): Boolean = withContext(Dispatchers.IO) {
-        if (!bindService(context)) return@withContext false
-        val service = commandService ?: return@withContext false
-
+        Log.d(TAG, "准备执行命令: $command")
+        if (!bindService(context)) {
+            Log.e(TAG, "绑定服务失败，无法执行命令")
+            return@withContext false
+        }
+        val service = commandService
+        if (service == null) {
+            Log.e(TAG, "commandService 为 null，无法执行命令")
+            return@withContext false
+        }
+        
+        Log.d(TAG, "服务已连接，开始发送命令: $command")
         val deferred = CompletableDeferred<Boolean>()
         val callback = object : ICallback.Stub() {
-            override fun onSuccess(output: String) { deferred.complete(true) }
+            override fun onSuccess(output: String) {
+                Log.d(TAG, "命令执行成功: $output")
+                deferred.complete(true)
+            }
             override fun onError(error: String) {
-                Log.e(TAG, "Cmd Error: $error")
+                Log.e(TAG, "命令执行失败: $error")
                 deferred.complete(false)
             }
         }
         try {
             service.executeCommand(command, callback)
-            withTimeoutOrNull(TIMEOUT_MS) { deferred.await() } ?: false
-        } catch (e: Exception) { false }
+            Log.d(TAG, "命令已发送，等待结果...")
+            val result = withTimeoutOrNull(TIMEOUT_MS) { deferred.await() }
+            Log.d(TAG, "命令执行结果: $result")
+            result ?: false
+        } catch (e: Exception) {
+            Log.e(TAG, "执行命令异常: ${e.message}", e)
+            false
+        }
     }
 
     /**

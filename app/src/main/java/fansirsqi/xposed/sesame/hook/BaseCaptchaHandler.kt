@@ -45,6 +45,8 @@ abstract class BaseCaptchaHandler {
         private const val MAX_SLIDE_RETRIES = 2
         // 滑动重试间隔时间（毫秒）
         private const val SLIDE_RETRY_INTERVAL = 500L
+        // 最大广播发送次数
+        private const val MAX_BROADCAST_COUNT = 1
 
     }
 
@@ -183,9 +185,10 @@ abstract class BaseCaptchaHandler {
     private suspend fun executeSlideWithRetry(activity: Activity, root: SimpleViewImage, slidePath: SlidePath): Boolean {
         val api = getSlidePathKey()
         val command = "input swipe ${slidePath.startX} ${slidePath.startY} ${slidePath.endX} ${slidePath.endY} $SLIDE_DURATION"
-        var broadcastSent = false
+        var broadcastCount = 0
         repeat(MAX_SLIDE_RETRIES) { retry ->
             Log.captcha(TAG, "========== 第 ${retry + 1} 次尝试滑动 ==========")
+            sleepCompat(3000)
             val swipeSuccess = SwipeUtil.swipe(
                 activity,
                 slidePath.startX,
@@ -194,10 +197,7 @@ abstract class BaseCaptchaHandler {
                 slidePath.endY,
                 SLIDE_DURATION
             )
-
             if (swipeSuccess) {
-                Log.captcha(TAG, "滑动操作执行成功，等待验证码文本消失...")
-                sleepCompat(2500)
                 Log.captcha(TAG, "开始检测验证码文本...")
                 if (checkCaptchaTextGone()) {
                     Log.captcha(TAG, "验证码文本已消失，滑动成功")
@@ -207,10 +207,10 @@ abstract class BaseCaptchaHandler {
                 }
             } else {
                 Log.captcha(TAG, "滑动操作执行失败，准备重试...")
-                if (!broadcastSent) {
-                    Log.captcha(TAG, "发送广播到 ShortX...")
+                if (broadcastCount < MAX_BROADCAST_COUNT) {
+                    Log.captcha(TAG, "发送广播到 ShortX... (第 ${broadcastCount + 1} 次)")
                     ApplicationHook.sendBroadcastShell(api, command)
-                    broadcastSent = true
+                    broadcastCount++
                 }
             }
 

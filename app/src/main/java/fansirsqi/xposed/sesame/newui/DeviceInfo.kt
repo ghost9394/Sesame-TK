@@ -163,9 +163,25 @@ object DeviceInfoUtil {
 
         try {
             service.executeCommand(command, callback)
+          //  service.executeCommand("input swipe 205 1587 1172 1587 500", callback)
             withTimeoutOrNull(TIMEOUT_MS) { deferred.await() } ?: ""
         } catch (_: Exception) {
             ""
+        }
+    }
+
+    /**
+     * 获取当前使用的 Shell 类型
+     */
+    private suspend fun getCurrentShellType(context: Context): String = withContext(Dispatchers.IO) {
+        if (!bindService(context)) return@withContext "未知"
+        val service = commandService ?: return@withContext "未知"
+
+        try {
+            service.shellType
+        } catch (e: Exception) {
+            Log.e(TAG, "获取 Shell 类型失败: ${e.message}")
+            "未知"
         }
     }
 
@@ -197,20 +213,19 @@ object DeviceInfoUtil {
             return "${Build.BRAND} ${Build.MODEL}"
         }
 
-        // 2. 关键修改：通过执行 id 命令来判断当前使用的是什么权限
-        val idOutput = execCommand(context, "id")
+        // 2. 获取当前使用的 Shell 类型
+        val currentShellType = getCurrentShellType(context)
 
         // 3. 判断 Shizuku 服务是否可用（辅助信息）
         val shizukuAvailable = isShizukuAvailable(context)
 
         // 4. 生成权限状态字符串
-        val permissionStatus = when {
-            // 如果 id 命令返回 uid=2000 或 shell，说明正在使用 Shizuku
-            idOutput.contains("uid=2000") || idOutput.contains("shell") -> "Shizuku (Shell) ✓"
-            // 否则就是没权限
-            else -> {
-                if (shizukuAvailable) "Shizuku  ✔" else "未授权滑块服务 ❌"
-            }
+        val permissionStatus = when (currentShellType) {
+            "RootShell" -> "Root ✓"
+            "ShizukuShell" -> "Shizuku (Shell) ✓"
+            "UserShell" -> "普通用户权限 ⚠"
+            "no_executor" -> "未授权滑块服务 ❌"
+            else -> "未知 ❌"
         }
 
         mapOf(

@@ -143,7 +143,7 @@ dependencies {
     implementation(libs.rikka.refine)             // Rikka 反射工具
 //    implementation(libs.rikka.hidden.stub)
     // implementation(libs.ui.tooling.preview.android)
-
+    implementation("com.github.niki914:cmd-android:0.8.2") // 用于通过 Shizuku 执行命令
 
     // Compose 相关依赖 - 现代化 UI 框架
     val composeBom = platform("androidx.compose:compose-bom:2025.12.00")  // Compose BOM 版本管理
