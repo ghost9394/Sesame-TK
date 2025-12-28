@@ -222,7 +222,7 @@ object DeviceInfoUtil {
         val permissionStatus = when (currentShellType) {
             "RootShell" -> "Root ✓"
             "ShizukuShell" -> "Shizuku (Shell) ✓"
-            "UserShell" -> "普通用户权限 ⚠"
+            "UserShell" -> "普通用户权限(正常使用) ✓"
             "no_executor" -> "未授权滑块服务 ❌"
             else -> "未知 ❌"
         }

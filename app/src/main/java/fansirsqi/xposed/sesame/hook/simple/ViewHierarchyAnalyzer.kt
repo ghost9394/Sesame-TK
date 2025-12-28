@@ -1,33 +1,30 @@
-package fansirsqi.xposed.sesame.hook
+package fansirsqi.xposed.sesame.hook.simple
 
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import fansirsqi.xposed.sesame.hook.simple.SimpleViewImage
-
-
 
 /**
- * A utility object for analyzing and traversing the view hierarchy.
+ * 用于分析和遍历视图层次结构的实用工具对象。
  */
 object ViewHierarchyAnalyzer {
 
     private const val TAG = "ViewHierarchyAnalyzer"
 
     /**
-     * Recursively logs the view hierarchy for debugging purposes.
-     * @param view The root view to start the analysis from.
-     * @param depth The current depth of recursion for formatting.
+     * 递归记录视图层次结构以供调试。
+     * @param view 开始分析的根视图。
+     * @param depth 当前递归深度，用于格式化。
      */
     fun logViewHierarchy(view: View, depth: Int) {
         val indent = "  ".repeat(depth)
         val className = view.javaClass.name
         val resourceId = try {
             "ID: ${view.resources.getResourceEntryName(view.id)}"
-        } catch (e: Exception) {
-            "ID: (none)"
+        } catch (_: Exception) {
+            "ID: (无)"
         }
         val location = IntArray(2).also { view.getLocationOnScreen(it) }
         val info = "loc=[${location[0]},${location[1]}] size=[${view.width}x${view.height}] visible=${view.isShown} enabled=${view.isEnabled}"
@@ -47,46 +44,46 @@ object ViewHierarchyAnalyzer {
     }
 
     /**
-     * Finds the actual slider button view by traversing from an anchor text view.
-     * It logs the hierarchy for debugging on the first attempt.
-     * @param slideTextView The SimpleViewImage wrapper for the "slide to verify" text view.
-     * @return The found slider View, or null if not found.
+     * 通过从锚点文本视图遍历，查找实际的滑块按钮视图。
+     * 它在第一次尝试时记录层次结构以供调试。
+     * @param slideTextView "滑动验证"文本视图的 SimpleViewImage 包装器。
+     * @return 找到的滑块视图，如果未找到则返回 null。
      */
     fun findActualSliderView(slideTextView: SimpleViewImage): View? {
         val parentView = slideTextView.originView.parent as? ViewGroup ?: return null
 
-        Log.d(TAG, "========= Analyzing slider parent view hierarchy =========")
+        Log.d(TAG, "========= 分析滑块父视图层次结构 =========")
         logViewHierarchy(parentView, 0)
-        Log.d(TAG, "========= End of view hierarchy analysis =========")
+        Log.d(TAG, "========= 视图层次结构分析结束 =========")
 
-        // Start a recursive search for the slider view within the parent container.
+        // 在父容器内开始递归搜索滑块视图。
         val slider = findSliderInGroup(parentView)
         if (slider != null) {
             val loc = IntArray(2).also { slider.getLocationOnScreen(it) }
-            Log.d(TAG, "Found draggable slider view: ${slider.javaClass.name} at loc=[${loc[0]},${loc[1]}]")
+            Log.d(TAG, "找到可拖动滑块视图: ${slider.javaClass.name} 位置=[${loc[0]},${loc[1]}]")
         } else {
-            Log.e(TAG, "Could not find the actual slider view. Please check the hierarchy logs above.")
+            Log.e(TAG, "无法找到实际的滑块视图。请检查上面的层次结构日志。")
         }
         return slider
     }
 
     /**
-     * Recursively searches for a candidate slider view within a ViewGroup.
-     * The strategy is to find a visible ImageView (the icon) and return its parent (the actual draggable view).
-     * @param viewGroup The group to search within.
-     * @return The found slider View, or null.
+     * 在 ViewGroup 中递归搜索候选滑块视图。
+     * 策略是找到一个可见的 ImageView（图标）并返回其父视图（实际可拖动的视图）。
+     * @param viewGroup 要搜索的组。
+     * @return 找到的滑块视图，或 null。
      */
     private fun findSliderInGroup(viewGroup: ViewGroup): View? {
         for (i in 0 until viewGroup.childCount) {
             val child = viewGroup.getChildAt(i)
 
-            // The draggable part is the parent of the visible ImageView icon.
+            // 可拖动部分是可见 ImageView 图标的父视图。
             if (child is ImageView && child.isShown) {
-                Log.d(TAG, "Found slider icon (ImageView). Returning its parent as the draggable view.")
+                Log.d(TAG, "找到滑块图标 (ImageView)。返回其父视图作为可拖动视图。")
                 return child.parent as? View
             }
 
-            // If not found, recurse into sub-ViewGroups.
+            // 如果未找到，递归到子 ViewGroup 中。
             if (child is ViewGroup) {
                 val foundInChild = findSliderInGroup(child)
                 if (foundInChild != null) {

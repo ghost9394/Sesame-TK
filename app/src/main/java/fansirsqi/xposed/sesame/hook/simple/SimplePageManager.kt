@@ -84,8 +84,6 @@ object SimplePageManager {
         if (!windowMonitorEnabled) {
             enableWindowMonitor()
             windowMonitorEnabled = true
-        } else {
-            Log.i(TAG, "窗口监控已经启用，跳过")
         }
     }
 
@@ -94,10 +92,8 @@ object SimplePageManager {
      */
     @SuppressLint("UseKtx")
     fun tryGetTopView(xpath: String): SimpleViewImage? {
-        Log.d(TAG, "tryGetTopView 搜索 xpath: $xpath, 对话框数量: ${dialogs.size}")
-
+        // Log.d(TAG, "tryGetTopView 搜索 xpath: $xpath, 对话框数量: ${dialogs.size}")
         dialogs.removeIf { it.get() == null }
-
         for (dialogWeakReference in dialogs) {
             val dialog = dialogWeakReference.get() ?: continue
             if (!dialog.isShowing) {
@@ -105,36 +101,13 @@ object SimplePageManager {
             }
             val decorView = dialog.window?.decorView ?: continue
             Log.d(TAG, "  - 对话框: ${dialog.javaClass.name}, 正在显示: ${dialog.isShowing}")
-
             debugPrintAllTextViews(decorView, 0)
-
             val viewImage = SimpleViewImage(decorView)
             val results = SimpleXpathParser.evaluate(viewImage, xpath)
             if (results.isNotEmpty()) {
-                Log.d(TAG, "  - 在对话框中找到!")
                 return results[0]
             }
         }
-
-//        Log.d(TAG, "  - 在任何对话框中都未找到")
-//
-//        // 如果在对话框中没找到，尝试在当前 Activity 中查找
-//        val topActivity = getTopActivity()
-//        if (topActivity != null) {
-//            Log.d(TAG, "  - 尝试在顶层 Activity 中查找: ${topActivity.javaClass.name}")
-//            val decorView = topActivity.window?.decorView
-//            if (decorView != null) {
-//                debugPrintAllTextViews(decorView, 0)
-//                val viewImage = SimpleViewImage(decorView)
-//                val results = SimpleXpathParser.evaluate(viewImage, xpath)
-//                if (results.isNotEmpty()) {
-//                    Log.d(TAG, "  - 在顶层 Activity 中找到!")
-//                    return results[0]
-//                }
-//            }
-//        }
-//
-//        Log.d(TAG, "  - 在顶层 Activity 中也未找到")
         return null
     }
 
@@ -217,7 +190,7 @@ object SimplePageManager {
                     }
                 }
             )
-            Log.i(TAG, "挂钩对话框构造函数($parameterTypesString) 成功")
+           // Log.i(TAG, "挂钩对话框构造函数($parameterTypesString) 成功")
         } catch (e: Throwable) {
             Log.e(TAG, "挂钩对话框构造函数($parameterTypesString) 错误: ", e)
         }
@@ -228,7 +201,6 @@ object SimplePageManager {
      */
     private fun enableWindowMonitor() {
         Log.i(TAG, "启用窗口监控被调用，类加载器: ${mClassLoader?.javaClass?.name}")
-
         hookDialogConstructor("android.content.Context")
         hookDialogConstructor("android.content.Context", Int::class.java)
         hookDialogConstructor(
@@ -252,7 +224,6 @@ object SimplePageManager {
                     }
                 }
             )
-            Log.i(TAG, "挂钩 CaptchaDialog.show() 成功")
         } catch (e: Throwable) {
             Log.e(TAG, "挂钩 CaptchaDialog.show() 错误: ", e)
         }
@@ -317,7 +288,7 @@ object SimplePageManager {
                 Log.e(TAG, "处理 Activity 出错: ${activity.javaClass.name}", throwable)
             }
             if (triggerCount > 10) {
-                Log.w(TAG, "Activity 事件触发失败次数过多: ${activityFocusHandler.javaClass}")
+              //  Log.w(TAG, "Activity 事件触发失败次数过多: ${activityFocusHandler.javaClass}")
                 return@launch
             }
             triggerActivityActive(activity, activityFocusHandler, triggerCount + 1)
