@@ -289,7 +289,7 @@ public class AntDodo extends ModelTask {
                     // --- 逻辑分支开始 ---
 
                     // 1. 万能卡逻辑
-                    if ("UNIVERSAL_CARD".equals(propGroup)) {
+                    if ("UNIVERSAL_CARD".equals(propGroup) && usePropUNIVERSAL_CARD.getValue()) {
                         for (int j = 0; j < propIdList.length(); j++) {
                             String pId = propIdList.getString(j);
                             // 寻找缺失的动物 ID
