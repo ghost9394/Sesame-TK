@@ -33,22 +33,19 @@ abstract class BaseCaptchaHandler {
     companion object {
         private const val TAG = "CaptchaHandler"
 
-        // 滑动位置偏移量和持续时间
-        private const val SLIDE_START_OFFSET = 25 // Offset from the left edge of the slider
-        private const val SLIDE_END_MARGIN = 20   // Margin from the right edge of the screen
+        // 滑动参数配置
+        private const val SLIDE_START_OFFSET = 25 // 滑动起始位置偏移量（像素）
+        private const val SLIDE_END_MARGIN = 20   // 滑动结束位置距离右侧的边距（像素）
         private const val SLIDE_DURATION_MIN = 400L // 最小滑动持续时间
         private const val SLIDE_DURATION_MAX = 800L // 最大滑动持续时间
 
         // 滑动后延迟检查是否成功
         private const val POST_SLIDE_CHECK_DELAY_MS = 2000L
 
-        // 查找滑动验证文本的 XPath。文本是中文的。
+        // 查找滑动验证文本的 XPath
         private const val SLIDE_VERIFY_TEXT_XPATH = "//TextView[contains(@text,'向右滑动验证')]"
 
-        // 方法切换开关 - true 表示使用简化滑动方法 false 表示使用复杂滑动方法
-        private const val USE_SIMPLE_SLIDE_METHOD = true
-
-        // 并发控制，防止多个处理程序同时运行。
+        // 并发控制，防止多个处理程序同时运行
         private val captchaProcessingMutex = Mutex()
     }
 
@@ -79,21 +76,14 @@ abstract class BaseCaptchaHandler {
             return true // 返回 true 告知上层已处理，避免重试
         }
         try {
-
             val slideTextInDialog = findSlideTextInDialog() ?: run {
                 Log.captcha(TAG, "未找到滑动验证文本，跳过处理")
                 return false // 未找到关键视图，返回 false 让其他处理器尝试
             }
             Log.captcha(TAG, "发现滑动验证文本: ${slideTextInDialog.getText()}")
             
-            // 根据开关选择使用哪种滑动方法
-            val result = if (USE_SIMPLE_SLIDE_METHOD) {
-                performSlideAndVerifySimple(activity, slideTextInDialog)
-            } else {
-                performSlideAndVerify(activity, slideTextInDialog)
-            }
-            
-            return result
+            // 执行滑动验证
+            return performSlideAndVerify(activity, slideTextInDialog)
         } catch (e: Exception) {
             Log.captcha(TAG, "处理滑动验证码时发生错误: ${e.stackTraceToString()}")
             return false
@@ -105,7 +95,7 @@ abstract class BaseCaptchaHandler {
     /**
      * 执行滑动操作并验证结果。
      * @param activity 当前的 Activity。
-     * @param slideTextView “向右滑动验证”文本的视图图像，作为查找滑块的锚点。
+     * @param slideTextView "向右滑动验证"文本的视图图像，作为查找滑块的锚点。
      * @return 如果验证码成功解除返回 true，否则返回 false。
      */
     private suspend fun performSlideAndVerify(activity: Activity, slideTextView: SimpleViewImage): Boolean {
@@ -114,15 +104,18 @@ abstract class BaseCaptchaHandler {
             Log.captcha(TAG, "未能找到可操作的滑块视图，滑动无法执行。")
             return false
         }
+        
         // 计算滑动坐标
-        val (startX, startY, endX, endY) = calculateSlideCoordinates(activity ,sliderView) ?: run {
+        val (startX, startY, endX, endY) = calculateSlideCoordinates(activity, sliderView) ?: run {
             Log.captcha(TAG, "计算滑动坐标失败，滑动无法执行。")
             return false
         }
         Log.captcha(TAG, "计算出的滑动路径: ($startX, $startY) -> ($endX, $endY)")
+        
         // 随机化滑动持续时间，模拟更自然的行为
         val slideDuration = Random.nextLong(SLIDE_DURATION_MIN, SLIDE_DURATION_MAX + 1)
         Log.captcha(TAG, "使用滑动持续时间: ${slideDuration}ms")
+        
         // 执行滑动
         MotionEventSimulator.simulateSwipe(
             view = sliderView,
@@ -157,7 +150,7 @@ abstract class BaseCaptchaHandler {
             return null
         }
         
-        // 获取屏幕尺寸信息 - 使用更简洁的方式
+        // 获取屏幕尺寸信息
         val displayMetrics = activity.resources.displayMetrics
         val screenWidth = displayMetrics.widthPixels
         val screenHeight = displayMetrics.heightPixels
@@ -183,11 +176,10 @@ abstract class BaseCaptchaHandler {
         val startY = sliderY + sliderHeight / 2f + Random.nextInt(-2, 3)
 
         // 计算滑动终点
-        // 使用容器右边界作为参考，但确保不超过屏幕边界
         val containerRightEdge = containerX + containerWidth
         val maxEndX = screenWidth - 50f // 距离屏幕右边缘50像素
         
-        // 计算理想的滑动终点（容器右端减去较小边距）
+        // 计算理想的滑动终点（容器右端减去边距）
         var endX = containerRightEdge - SLIDE_END_MARGIN.toFloat() + Random.nextInt(-5, 6) // 添加随机偏移
         
         // 确保滑动终点不超过屏幕边界
@@ -195,6 +187,7 @@ abstract class BaseCaptchaHandler {
             endX = maxEndX
             Log.captcha(TAG, "调整滑动终点以适配屏幕边界")
         }
+        
         // 确保滑动距离足够（至少滑块宽度的1.5倍）
         val minSlideDistance = sliderWidth * 1.5f
         val actualSlideDistance = endX - startX
@@ -229,7 +222,6 @@ abstract class BaseCaptchaHandler {
         }
     }
 
-
     /**
      * 在对话框视图中查找滑动验证文本。
      * @return 如果找到则返回文本视图的 SimpleViewImage，否则返回 null。
@@ -237,82 +229,10 @@ abstract class BaseCaptchaHandler {
     private fun findSlideTextInDialog(): SimpleViewImage? {
         return try {
             Log.captcha(TAG, "尝试通过 XPath 查找滑动验证文本: $SLIDE_VERIFY_TEXT_XPATH")
-             return SimplePageManager.tryGetTopView(SLIDE_VERIFY_TEXT_XPATH)
+            SimplePageManager.tryGetTopView(SLIDE_VERIFY_TEXT_XPATH)
         } catch (e: Exception) {
             Log.captcha(TAG, "由于异常导致查找验证码文本失败: ${e.stackTraceToString()}")
             null
         }
     }
-    /**
-     * 获取滑动区域的位置信息
-     * @param slideText 滑动文本视图
-     * @return 滑动区域的位置数组，获取失败返回 null
-     */
-    private fun getSlideRect(slideText: SimpleViewImage): IntArray? {
-        val slideTextParent = slideText.parentNode(1) ?: return null
-        return slideTextParent.locationOnScreen()
-    }
-    /**
-     * 计算滑动路径 - 使用内联参数（旧方法风格）
-     * @param activity 当前 Activity
-     * @param slideRect 滑动区域位置
-     * @return 计算得到的滑动路径
-     */
-    private fun calculateSlidePath(activity: Activity, slideRect: IntArray): SlideCoordinates {
-        val displayMetrics = activity.resources.displayMetrics
-        val screenWidth = displayMetrics.widthPixels
-        // 使用内联参数 - 旧方法风格
-        val startOffset = 50  // 滑动起始位置偏移量（像素）
-        val endMargin = 100    // 滑动结束位置距离屏幕右侧的边距（像素）
-        // 修复类型转换问题，并添加随机化使滑动更自然
-        val startX: Float = slideRect[0].toFloat() + startOffset + Random.nextInt(-2, 3)
-        val centerY: Float = slideRect[1].toFloat() + startOffset + Random.nextInt(-2, 3)
-        val endX: Float = screenWidth - endMargin + Random.nextInt(-5, 6).toFloat()
-        return SlideCoordinates(startX, centerY, endX, centerY)
-    }
-
-    /**
-     * 执行滑动操作并验证结果 - 使用旧的滑动路径计算方法（备选方案）
-     * @param activity 当前的 Activity。
-     * @param slideTextView "向右滑动验证"文本的视图图像，作为查找滑块的锚点。
-     * @return 如果验证码成功解除返回 true，否则返回 false。
-     */
-    private suspend fun performSlideAndVerifySimple(activity: Activity, slideTextView: SimpleViewImage): Boolean {
-        // 获取滑动区域位置
-        val slideRect = getSlideRect(slideTextView) ?: run {
-            Log.captcha(TAG, "未能获取滑动区域位置")
-            return false
-        }
-        
-        // 使用旧的简化方法计算滑动路径 - 内联参数风格
-        val (startX, startY, endX, endY) = calculateSlidePath(activity, slideRect)
-        Log.captcha(TAG, "计算出的滑动路径: ($startX, $startY) -> ($endX, $endY)")
-        // 随机化滑动持续时间
-        val slideDuration = Random.nextLong(SLIDE_DURATION_MIN, SLIDE_DURATION_MAX + 1)
-        Log.captcha(TAG, "使用滑动持续时间: ${slideDuration}ms")
-        // 获取滑块视图（用于触摸事件）
-        val sliderView = ViewHierarchyAnalyzer.findActualSliderView(slideTextView) ?: run {
-            Log.captcha(TAG, "未能找到可操作的滑块视图")
-            return false
-        }
-        // 执行滑动
-        MotionEventSimulator.simulateSwipe(
-            view = sliderView,
-            startX = startX,
-            startY = startY,
-            endX = endX,
-            endY = endY,
-            duration = slideDuration
-        )
-        delay(POST_SLIDE_CHECK_DELAY_MS)
-        return if (checkCaptchaTextGone()) {
-            Log.captcha(TAG, "简化方法滑动成功")
-            true
-        } else {
-            Log.captcha(TAG, "简化方法滑动失败，尝试使用精确方法")
-            // 如果简化方法失败，回退到精确方法
-            performSlideAndVerify(activity, slideTextView)
-        }
-    }
-
 }
