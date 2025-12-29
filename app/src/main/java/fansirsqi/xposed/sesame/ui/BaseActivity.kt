@@ -7,7 +7,6 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.material.appbar.MaterialToolbar
 import fansirsqi.xposed.sesame.R
-import fansirsqi.xposed.sesame.data.ViewAppInfo
 import fansirsqi.xposed.sesame.util.PermissionUtil
 
 open class BaseActivity : AppCompatActivity() {
@@ -19,7 +18,7 @@ open class BaseActivity : AppCompatActivity() {
     }
 
     // 暂存标题
-    private var pendingTitle: CharSequence? = ViewAppInfo.appTitle
+    private var pendingTitle: CharSequence? = null
     private var pendingSubtitle: CharSequence? = null
 
     // 标记是否使用 Compose (可选，或者直接判断 toolbar 是否为 null)
@@ -37,7 +36,6 @@ open class BaseActivity : AppCompatActivity() {
     }
 
     private fun initialize() {
-        ViewAppInfo.init(applicationContext)
         // Edge-to-Edge 支持
         WindowCompat.setDecorFitsSystemWindows(window, false)
         // 控制状态栏文字颜色

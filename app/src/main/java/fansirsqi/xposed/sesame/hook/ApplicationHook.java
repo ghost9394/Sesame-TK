@@ -38,9 +38,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import fansirsqi.xposed.sesame.BuildConfig;
 import fansirsqi.xposed.sesame.data.Config;
 import fansirsqi.xposed.sesame.data.General;
-import fansirsqi.xposed.sesame.data.RunType;
 import fansirsqi.xposed.sesame.data.Status;
-import fansirsqi.xposed.sesame.data.ViewAppInfo;
 import fansirsqi.xposed.sesame.entity.AlipayVersion;
 import fansirsqi.xposed.sesame.hook.rpc.bridge.NewRpcBridge;
 import fansirsqi.xposed.sesame.hook.rpc.bridge.OldRpcBridge;
@@ -1328,17 +1326,6 @@ public class ApplicationHook {
                         case BroadcastActions.RE_LOGIN:
                             Log.printStack(TAG);
                             GlobalThreadPools.INSTANCE.execute(ApplicationHook::reLogin);
-                            break;
-                        case BroadcastActions.STATUS:
-                            // 状态查询处理
-                            Log.printStack(TAG);
-                            if (ViewAppInfo.getRunType() == RunType.DISABLE) {
-                                Intent replyIntent = new Intent("fansirsqi.xposed.sesame.status");
-                                replyIntent.putExtra("EXTRA_RUN_TYPE", RunType.ACTIVE.getNickName());
-                                replyIntent.setPackage(General.MODULE_PACKAGE_NAME);
-                                context.sendBroadcast(replyIntent);
-                                Log.system(TAG, "Replied with status: " + RunType.ACTIVE.getNickName());
-                            }
                             break;
                         case BroadcastActions.RPC_TEST:
                             GlobalThreadPools.INSTANCE.execute(() -> {

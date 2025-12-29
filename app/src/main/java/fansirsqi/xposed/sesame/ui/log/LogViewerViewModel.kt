@@ -76,7 +76,7 @@ class LogViewerViewModel(application: Application) : AndroidViewModel(applicatio
     private var currentDisplayLines: List<String> = emptyList()
 
     // 限制最大行数，防止 OOM
-    private val maxLines = 200_000
+    private val maxLines = 50_000
 
     /**
      * 加载日志文件
@@ -102,24 +102,54 @@ class LogViewerViewModel(application: Application) : AndroidViewModel(applicatio
 
     /**
      * 读取文件内容 (核心修复逻辑)
-     * 使用 useLines (底层为 BufferedReader) 顺序读取，兼容性最好。
-     * 遇到权限问题时会捕获异常，防止崩溃。
+     * 使用手动分块读取，以防止因单行超长而导致的 OOM。
      */
     private suspend fun reloadFileContent(file: File) = withContext(Dispatchers.IO) {
         try {
             _uiState.update { it.copy(isLoading = true) }
 
             val buffer = ArrayDeque<String>(maxLines)
+            val maxLineLength = 10_000 // 单行最大长度，防止 OOM
+            val charBuffer = CharArray(8192) // 8KB 缓冲区
+            val lineBuilder = StringBuilder()
+            var skippingLongLine = false
 
-            // 使用 useLines 流式读取，自动处理 buffer，避免 OOM
-            // 这种方式不依赖 RandomAccessFile，能避开部分 EACCES 问题
-            file.useLines { sequence ->
-                sequence.forEach { line ->
-                    if (buffer.size >= maxLines) {
-                        buffer.removeFirst() // 保持最新的 N 行
+            file.inputStream().buffered().reader(Charsets.UTF_8).use { reader ->
+                while (true) {
+                    ensureActive()
+                    val charsRead = reader.read(charBuffer)
+                    if (charsRead == -1) break
+
+                    for (i in 0 until charsRead) {
+                        val char = charBuffer[i]
+                        if (char == '\n') {
+                            if (!skippingLongLine) {
+                                if (buffer.size >= maxLines) buffer.removeFirst()
+                                buffer.addLast(lineBuilder.toString())
+                            }
+                            lineBuilder.clear()
+                            skippingLongLine = false
+                        } else {
+                            if (!skippingLongLine) {
+                                if (lineBuilder.length < maxLineLength) {
+                                    lineBuilder.append(char)
+                                } else {
+                                    // 超过单行最大长度，截断并标记
+                                    if (buffer.size >= maxLines) buffer.removeFirst()
+                                    buffer.addLast("$lineBuilder... [TRUNCATED]")
+                                    lineBuilder.clear()
+                                    skippingLongLine = true
+                                }
+                            }
+                        }
                     }
-                    buffer.addLast(line)
                 }
+            }
+
+            // 添加文件末尾没有换行符的最后一行
+            if (!skippingLongLine && lineBuilder.isNotEmpty()) {
+                if (buffer.size >= maxLines) buffer.removeFirst()
+                buffer.addLast(lineBuilder.toString())
             }
 
             // 更新内存数据
@@ -128,8 +158,8 @@ class LogViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 allLogLines.addAll(buffer)
             }
 
-            // 刷新列表（处理搜索过滤）
-            refreshList()// 这里会重置 isLoading
+            // 刷新列表
+            refreshList()
 
         } catch (e: Exception) {
             e.printStackTrace()

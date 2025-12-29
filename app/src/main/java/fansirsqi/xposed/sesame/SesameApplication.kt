@@ -23,12 +23,9 @@ class SesameApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         ToastUtil.init(this) // 初始化全局 Context
-
         Log.init(this)
-
         val processName = getCurrentProcessName()
         Log.runtime(TAG, "🚀 应用启动 | 进程: $processName | PID: ${Process.myPid()}")
-
         // 启动 CommandService
         startCommandService()
     }

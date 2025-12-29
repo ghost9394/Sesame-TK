@@ -11,14 +11,20 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,7 +49,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,11 +57,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,14 +72,14 @@ import fansirsqi.xposed.sesame.R
 import fansirsqi.xposed.sesame.SesameApplication.Companion.hasPermissions
 import fansirsqi.xposed.sesame.SesameApplication.Companion.preferencesKey
 import fansirsqi.xposed.sesame.data.RunType
-import fansirsqi.xposed.sesame.data.ViewAppInfo
-import fansirsqi.xposed.sesame.data.ViewAppInfo.verifyId
 import fansirsqi.xposed.sesame.newui.DeviceInfoCard
 import fansirsqi.xposed.sesame.newui.DeviceInfoUtil
-import fansirsqi.xposed.sesame.newui.WatermarkView
 import fansirsqi.xposed.sesame.newutil.IconManager
+import fansirsqi.xposed.sesame.ui.MainViewModel.Companion.verifyId
+import fansirsqi.xposed.sesame.ui.components.WatermarkLayer
 import fansirsqi.xposed.sesame.ui.log.LogViewerComposeActivity
-import fansirsqi.xposed.sesame.ui.theme.BaseTheme
+import fansirsqi.xposed.sesame.ui.theme.AppTheme
+import fansirsqi.xposed.sesame.util.Detector
 import fansirsqi.xposed.sesame.util.Files
 import fansirsqi.xposed.sesame.util.Log
 import fansirsqi.xposed.sesame.util.PermissionUtil
@@ -84,7 +91,7 @@ import java.io.File
 class MainActivity : BaseActivity() {
 
     private val viewModel: MainViewModel by viewModels()
-    private lateinit var watermarkView: WatermarkView
+//    private lateinit var watermarkView: WatermarkView
 
     // Shizuku 监听器
     private val shizukuListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
@@ -100,6 +107,8 @@ class MainActivity : BaseActivity() {
         // 1. 检查权限并初始化逻辑
         if (PermissionUtil.checkOrRequestFilePermissions(this)) {
             viewModel.initAppLogic()
+            // 🔥 修复：Native 检测必须在 Activity 中调用
+            initNativeDetector()
         }
 
         // 2. 初始化 Shizuku
@@ -110,36 +119,43 @@ class MainActivity : BaseActivity() {
         IconManager.syncIconState(this, prefs.getBoolean("is_icon_hidden", false))
 
         // 4. 安装水印 (这是一个 View，挂载到 Window 上，不影响 Compose)
-        watermarkView = WatermarkView.install(this)
+//        watermarkView = WatermarkView.install(this)
 
         // 5. 设置 Compose 内容 (替代 setContentView)
         setContent {
-            // 定义主题颜色 (可以提取到单独的 Theme.kt)
-            val colorScheme = lightColorScheme(
-                primary = Color(0xFF3F51B5),
-                onPrimary = Color.White,
-                background = Color(0xFFF5F5F5),
-                surface = Color.White,
-                surfaceVariant = Color(0xFFE0E0E0)
-            )
+// 收集 ViewModel 状态
+            val oneWord by viewModel.oneWord.collectAsStateWithLifecycle()
+            val runType by viewModel.runType.collectAsStateWithLifecycle()
+            val activeUser by viewModel.activeUser.collectAsStateWithLifecycle()
+            val userList by viewModel.userList.collectAsStateWithLifecycle()
 
-            MaterialTheme(colorScheme = colorScheme) {
-                // 收集 ViewModel 状态
-                val oneWord by viewModel.oneWord.collectAsStateWithLifecycle()
-                val runType by viewModel.runType.collectAsStateWithLifecycle()
-                val activeUser by viewModel.activeUser.collectAsStateWithLifecycle()
-                val userList by viewModel.userList.collectAsStateWithLifecycle()
 
-                MainScreen(
-                    oneWord = oneWord,
-                    runType = runType,
-                    activeUserName = activeUser?.showName ?: "未载入^o^ 重启支付宝看看👀",
-                    onEvent = { event -> handleEvent(event, userList) } // 处理点击事件
-                )
+            AppTheme {
+                WatermarkLayer {
+                    MainScreen(
+                        oneWord = oneWord,
+                        runType = runType,
+                        activeUserName = activeUser?.showName ?: "未载入^o^ 重启支付宝看看👀",
+                        viewModel = viewModel,
+                        onEvent = { event -> handleEvent(event, userList) } // 处理点击事件
+                    )
+                }
             }
+
         }
 
-        WatermarkView.install(activity = this)
+//        WatermarkView.install(activity = this)
+    }
+
+    // 🔥 新增：在 Activity 中执行 Native 检测
+    private fun initNativeDetector() {
+        try {
+            if (Detector.loadLibrary("checker")) {
+                Detector.initDetector(this)
+            }
+        } catch (e: Exception) {
+            Log.error("MainActivity", "Native detector init failed: ${e.message}")
+        }
     }
 
     /**
@@ -225,9 +241,10 @@ class MainActivity : BaseActivity() {
         Shizuku.removeRequestPermissionResultListener(shizukuListener)
     }
 
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        watermarkView.refresh()
+//        watermarkView.refresh()
     }
 
     private fun openLogFile(logFile: File) {
@@ -309,197 +326,241 @@ fun MainScreen(
     oneWord: String,
     runType: RunType,
     activeUserName: String,
+    viewModel: MainViewModel, // 建议直接传 VM 或者把 isLoading 传进来
     onEvent: (MainActivity.MainUiEvent) -> Unit
 ) {
-    BaseTheme {
-        val context = LocalContext.current
+    val context = LocalContext.current
 
-        // 获取当前图标隐藏状态 (从 SP 读取，这里简单用 remember 读取一次，更严谨应该从 ViewModel 读)
-        val prefs = context.getSharedPreferences(preferencesKey, android.content.Context.MODE_PRIVATE)
-        var isIconHidden by remember { mutableStateOf(prefs.getBoolean("is_icon_hidden", false)) }
+    val isOneWordLoading by viewModel.isOneWordLoading.collectAsStateWithLifecycle()//获取一言加载状态
 
-        // 控制下拉菜单显示
-        var showMenu by remember { mutableStateOf(false) }
+    // 获取当前图标隐藏状态 (从 SP 读取，这里简单用 remember 读取一次，更严谨应该从 ViewModel 读)
+    val prefs = context.getSharedPreferences(preferencesKey, android.content.Context.MODE_PRIVATE)
+    var isIconHidden by remember { mutableStateOf(prefs.getBoolean("is_icon_hidden", false)) }
 
-        // 异步加载设备信息，启动后自动更新3次
-        val deviceInfoMap by produceState<Map<String, String>?>(initialValue = null) {
+    // 控制下拉菜单显示
+    var showMenu by remember { mutableStateOf(false) }
+
+    // 异步加载设备信息，启动后自动更新3次
+    val deviceInfoMap by produceState<Map<String, String>?>(initialValue = null) {
+        value = DeviceInfoUtil.showInfo(verifyId, context)
+
+        repeat(1) {
+            kotlinx.coroutines.delay(200)
             value = DeviceInfoUtil.showInfo(verifyId, context)
-
-            repeat(1) {
-                kotlinx.coroutines.delay(200)
-                value = DeviceInfoUtil.showInfo(verifyId, context)
-            }
         }
+    }
 
-        Scaffold(
-            topBar = {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "${ViewAppInfo.appTitle} [${runType.nickName}]",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = when (runType) {
-                                    RunType.DISABLE -> Color(0xFFE57373)
-                                    RunType.ACTIVE -> Color(0xFF81C784)
-                                    RunType.LOADED -> MaterialTheme.colorScheme.onSurface
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "Module [${runType.nickName}]",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = when (runType) {
+                                RunType.DISABLE -> Color(0xFFE57373)
+                                RunType.ACTIVE -> Color(0xFF81C784)
+                                RunType.LOADED -> MaterialTheme.colorScheme.onSurface
+                            }
+                        )
+                        Text(
+                            text = "当前载入: $activeUserName",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                ),
+                // 🔥 添加右侧菜单按钮
+                actions = {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "更多")
+                    }
+
+                    // 下拉菜单
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        // 1. 隐藏/显示图标
+                        DropdownMenuItem(
+                            text = { Text(if (isIconHidden) "显示应用图标" else "隐藏应用图标") },
+                            onClick = {
+                                isIconHidden = !isIconHidden
+                                onEvent(MainActivity.MainUiEvent.ToggleIconHidden(isIconHidden))
+                                showMenu = false
+                            }
+                        )
+                        // 2. 查看抓包
+                        DropdownMenuItem(
+                            text = { Text("查看抓包") },
+                            onClick = {
+                                onEvent(MainActivity.MainUiEvent.OpenCaptureLog)
+                                showMenu = false
+                            }
+                        )
+                        // 3. 扩展功能
+                        DropdownMenuItem(
+                            text = { Text("扩展功能") },
+                            onClick = {
+                                onEvent(MainActivity.MainUiEvent.OpenExtend)
+                                showMenu = false
+                            }
+                        )
+                        // 4. 清除配置 (仅 Debug 模式显示)
+                        if (BuildConfig.DEBUG) {
+                            DropdownMenuItem(
+                                text = { Text("清除配置") },
+                                onClick = {
+                                    onEvent(MainActivity.MainUiEvent.ClearConfig)
+                                    showMenu = false
                                 }
                             )
+                        }
+                    }
+                }
+            )
+        },
+    ) { innerPadding ->
+        // ... (Body 内容保持不变) ...
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // ... 设备信息卡片 + 一言 ...
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                if (deviceInfoMap != null) {
+                    DeviceInfoCard(deviceInfoMap!!)
+                } else {
+                    CircularProgressIndicator()
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        // 🔥 核心防抖：设置最小高度 (例如 60dp)，保证即使内容变化，占据的空间也不会忽大忽小
+                        .heightIn(min = 100.dp)
+                        .padding(8.dp)
+                        .clip(RoundedCornerShape(8.dp)) // 点击水波纹圆角
+                        .clickable(
+                            // 只有不在加载时才允许点击
+                            enabled = !isOneWordLoading,
+                            onClick = { onEvent(MainActivity.MainUiEvent.RefreshOneWord) }
+                        )
+                        .padding(8.dp) // 内部留白
+                ) {
+                    // 使用动画平滑切换 Loading 和 文本
+                    AnimatedContent(
+                        targetState = isOneWordLoading,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "OneWordAnimation"
+                    ) { loading ->
+                        if (loading) {
+                            Column( // 🔥 加这层
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {// 状态 A: 显示小转圈
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp), // 小一点，精致一点
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(1.dp))
+                                Text(
+                                    "本来无一物,何处惹尘..",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+
+                        } else {
+                            // 状态 B: 显示文本
                             Text(
-                                text = "当前载入: $activeUserName",
-                                style = MaterialTheme.typography.bodySmall,
+                                text = oneWord,
+                                fontSize = 16.sp,
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
-                    ),
-                    // 🔥 添加右侧菜单按钮
-                    actions = {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "更多")
-                        }
-
-                        // 下拉菜单
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
-                            // 1. 隐藏/显示图标
-                            DropdownMenuItem(
-                                text = { Text(if (isIconHidden) "显示应用图标" else "隐藏应用图标") },
-                                onClick = {
-                                    isIconHidden = !isIconHidden
-                                    onEvent(MainActivity.MainUiEvent.ToggleIconHidden(isIconHidden))
-                                    showMenu = false
-                                }
-                            )
-                            // 2. 查看抓包
-                            DropdownMenuItem(
-                                text = { Text("查看抓包") },
-                                onClick = {
-                                    onEvent(MainActivity.MainUiEvent.OpenCaptureLog)
-                                    showMenu = false
-                                }
-                            )
-                            // 3. 扩展功能
-                            DropdownMenuItem(
-                                text = { Text("扩展功能") },
-                                onClick = {
-                                    onEvent(MainActivity.MainUiEvent.OpenExtend)
-                                    showMenu = false
-                                }
-                            )
-                            // 4. 清除配置 (仅 Debug 模式显示)
-                            if (BuildConfig.DEBUG) {
-                                DropdownMenuItem(
-                                    text = { Text("清除配置") },
-                                    onClick = {
-                                        onEvent(MainActivity.MainUiEvent.ClearConfig)
-                                        showMenu = false
-                                    }
-                                )
-                            }
-                        }
                     }
-                )
-            },
-            containerColor = MaterialTheme.colorScheme.background
-        ) { innerPadding ->
-            // ... (Body 内容保持不变) ...
+                }
+            }
+
+            // ... 底部按钮 ...
             Column(
                 modifier = Modifier
-                    .padding(innerPadding)
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.SpaceBetween
+                    .fillMaxWidth()
+                    .padding(bottom = 48.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // ... 设备信息卡片 + 一言 ...
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                // ... 第一行按钮 ...
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (deviceInfoMap != null) {
-                        DeviceInfoCard(deviceInfoMap!!)
-                    } else {
-                        CircularProgressIndicator()
-                    }
+                    MenuButton(
+                        text = "森林日志",
+                        icon = Icons.Rounded.Forest,
+                        modifier = Modifier.weight(1f)
+                    ) { onEvent(MainActivity.MainUiEvent.OpenForestLog) }
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    MenuButton(
+                        text = "农场日志",
+                        icon = Icons.Rounded.Agriculture,
+                        modifier = Modifier.weight(1f)
+                    ) { onEvent(MainActivity.MainUiEvent.OpenFarmLog) }
 
-                    Text(
-                        text = oneWord,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .clickable { onEvent(MainActivity.MainUiEvent.RefreshOneWord) }
-                            .padding(8.dp)
-                    )
+                    MenuButton(
+                        text = "其他日志",
+                        icon = Icons.Rounded.AlignVerticalTop,
+                        modifier = Modifier.weight(1f)
+                    ) { onEvent(MainActivity.MainUiEvent.OpenOtherLog) }
                 }
 
-                // ... 底部按钮 ...
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 48.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                // ... 第二行按钮 ...
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // ... 第一行按钮 ...
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        MenuButton(
-                            text = "森林日志",
-                            icon = Icons.Rounded.Forest,
-                            modifier = Modifier.weight(1f)
-                        ) { onEvent(MainActivity.MainUiEvent.OpenForestLog) }
+                    MenuButton(
+                        text = "错误日志",
+                        icon = Icons.Rounded.BugReport,
+                        modifier = Modifier.weight(1f)
+                    ) { onEvent(MainActivity.MainUiEvent.OpenErrorLog) }
 
-                        MenuButton(
-                            text = "农场日志",
-                            icon = Icons.Rounded.Agriculture,
-                            modifier = Modifier.weight(1f)
-                        ) { onEvent(MainActivity.MainUiEvent.OpenFarmLog) }
+                    MenuButton(
+                        text = "全部日志",
+                        icon = Icons.Rounded.Description,
+                        modifier = Modifier.weight(1f)
+                    ) { onEvent(MainActivity.MainUiEvent.OpenAllLog) }
 
-                        MenuButton(
-                            text = "其他日志",
-                            icon = Icons.Rounded.AlignVerticalTop,
-                            modifier = Modifier.weight(1f)
-                        ) { onEvent(MainActivity.MainUiEvent.OpenOtherLog) }
-                    }
-
-                    // ... 第二行按钮 ...
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        MenuButton(
-                            text = "错误日志",
-                            icon = Icons.Rounded.BugReport,
-                            modifier = Modifier.weight(1f)
-                        ) { onEvent(MainActivity.MainUiEvent.OpenErrorLog) }
-
-                        MenuButton(
-                            text = "全部日志",
-                            icon = Icons.Rounded.Description,
-                            modifier = Modifier.weight(1f)
-                        ) { onEvent(MainActivity.MainUiEvent.OpenAllLog) }
-
-                        MenuButton(
-                            text = "设置",
-                            icon = Icons.Rounded.Settings,
-                            modifier = Modifier.weight(1f)
-                        ) { onEvent(MainActivity.MainUiEvent.OpenSettings) }
-                    }
+                    MenuButton(
+                        text = "设置",
+                        icon = Icons.Rounded.Settings,
+                        modifier = Modifier.weight(1f)
+                    ) { onEvent(MainActivity.MainUiEvent.OpenSettings) }
                 }
             }
         }
     }
 }
+
 
 /**
  * 封装的 M3 风格按钮组件
@@ -516,8 +577,9 @@ fun MenuButton(
         modifier = modifier.height(80.dp), // 固定高度
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = MaterialTheme.colorScheme.surface, // 白色/表面色
+            containerColor = MaterialTheme.colorScheme.surfaceVariant, //background
             contentColor = MaterialTheme.colorScheme.primary
+
         ),
         elevation = ButtonDefaults.filledTonalButtonElevation(defaultElevation = 2.dp)
     ) {
@@ -526,11 +588,12 @@ fun MenuButton(
             verticalArrangement = Arrangement.Center
         ) {
             Icon(
+
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(28.dp)
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(5.dp))
             Text(
                 text = text,
                 style = MaterialTheme.typography.labelMedium,

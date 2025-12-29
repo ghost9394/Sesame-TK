@@ -1,5 +1,6 @@
 package fansirsqi.xposed.sesame.newutil
 
+import android.annotation.SuppressLint
 import android.util.Log
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.core.util.DefaultIndenter
@@ -38,6 +39,7 @@ object DataStore {
 
     private var onChangeListener: (() -> Unit)? = null
 
+    @Suppress("unused")
     fun setOnChangeListener(listener: () -> Unit) {
         onChangeListener = listener
     }
@@ -81,12 +83,13 @@ object DataStore {
      * 设置文件/目录为全局可读写 (Linux 权限 777/666)
      * 这在 Xposed 跨进程通信中通常是必须的
      */
+    @SuppressLint("SetWorldReadable", "SetWorldWritable")
     private fun setWorldReadableWritable(file: File) {
         try {
             file.setReadable(true, false)
             file.setWritable(true, false)
             file.setExecutable(true, false) // 对目录需要执行权限
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // 忽略某些系统限制导致的失败
         }
     }
@@ -129,16 +132,14 @@ object DataStore {
     @Suppress("UNCHECKED_CAST")
     private fun <T> createDefault(typeRef: TypeReference<T>): T {
         val javaType = mapper.typeFactory.constructType(typeRef)
-        val rawClass = javaType.rawClass
-
-        return when {
-            rawClass == List::class.java || rawClass == java.util.List::class.java -> ArrayList<Any>() as T
-            rawClass == Set::class.java || rawClass == java.util.Set::class.java -> LinkedHashSet<Any>() as T
-            rawClass == Map::class.java || rawClass == java.util.Map::class.java -> LinkedHashMap<String, Any>() as T
-            rawClass == String::class.java -> "" as T
-            rawClass == Boolean::class.java || rawClass == java.lang.Boolean::class.java -> false as T
-            rawClass == Int::class.java || rawClass == java.lang.Integer::class.java -> 0 as T
-            rawClass == Long::class.java || rawClass == java.lang.Long::class.java -> 0L as T
+        return when (val rawClass = javaType.rawClass) {
+            List::class.java, java.util.List::class.java -> ArrayList<Any>() as T
+            Set::class.java, java.util.Set::class.java -> LinkedHashSet<Any>() as T
+            Map::class.java, java.util.Map::class.java -> LinkedHashMap<String, Any>() as T
+            String::class.java -> "" as T
+            Boolean::class.java, java.lang.Boolean::class.java -> false as T
+            Int::class.java, java.lang.Integer::class.java -> 0 as T
+            Long::class.java, java.lang.Long::class.java -> 0L as T
             else -> {
                 try {
                     // 尝试无参构造
@@ -212,11 +213,11 @@ object DataStore {
                 // 记录写入时间
                 lastWriteTime.set(System.currentTimeMillis())
 
-                // 原子重命名
-                if (storageFile.exists()) {
-                    // Android 上 renameTo 有时不能覆盖已存在文件，需先删除
-                    // 注意：这里有极小的竞态窗口，但在 Android 文件系统中通常是原子或安全的
-                }
+//                // 原子重命名
+//                if (storageFile.exists()) {
+//                    // Android 上 renameTo 有时不能覆盖已存在文件，需先删除
+//                    // 注意：这里有极小的竞态窗口，但在 Android 文件系统中通常是原子或安全的
+//                }
 
                 if (tempFile.renameTo(storageFile)) {
                     // 更新加载时间，避免 Watcher 再次触发加载
@@ -247,7 +248,7 @@ object DataStore {
             while (true) {
                 val key = try {
                     watchService.take()
-                } catch (e: InterruptedException) {
+                } catch (_: InterruptedException) {
                     break
                 }
 

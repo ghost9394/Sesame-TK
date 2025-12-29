@@ -1,10 +1,13 @@
 package fansirsqi.xposed.sesame.task.antDodo;
+import static fansirsqi.xposed.sesame.entity.OtherEntityProvider.listPropGroupOptions;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -27,6 +30,19 @@ import fansirsqi.xposed.sesame.util.maps.UserMap;
 import fansirsqi.xposed.sesame.util.ResChecker;
 import fansirsqi.xposed.sesame.util.TimeUtil;
 public class AntDodo extends ModelTask {
+
+    /**
+     * 仅限 AntDodo 内部使用的道具组常量定义
+     */
+    public interface PropGroupType {
+        /** 当前图鉴抽卡券 🎴 */
+        String COLLECT_ANIMAL = "COLLECT_ANIMAL";
+        /** 好友卡抽卡券 👥 */
+        String ADD_COLLECT_TO_FRIEND_LIMIT = "ADD_COLLECT_TO_FRIEND_LIMIT";
+        /** 万能卡 🃏 */
+        String UNIVERSAL_CARD = "UNIVERSAL_CARD";
+    }
+
     private static final String TAG = AntDodo.class.getSimpleName();
     @Override
     public String getName() {
@@ -45,10 +61,9 @@ public class AntDodo extends ModelTask {
     private SelectModelField collectToFriendList;
     private SelectModelField sendFriendCard;
 
-    private BooleanModelField usePropUNIVERSAL_CARD;            //万能卡
+    private SelectModelField usepropGroup;  //道具使用类型
+    private ChoiceModelField usePropUNIVERSALCARDType;         //万能卡使用方法
 
-    private ChoiceModelField usePropUNIVERSALCARDType;         //万能卡使用类型
-    private BooleanModelField usePropaddCOLLECTTOFRIENDLIMIT;           //抽好友道具卡
     private BooleanModelField autoGenerateBook;
     @Override
     public ModelFields getFields() {
@@ -57,9 +72,11 @@ public class AntDodo extends ModelTask {
         modelFields.addField(collectToFriendType = new ChoiceModelField("collectToFriendType", "帮抽卡 | 动作", CollectToFriendType.COLLECT, CollectToFriendType.nickNames));
         modelFields.addField(collectToFriendList = new SelectModelField("collectToFriendList", "帮抽卡 | 好友列表", new LinkedHashSet<>(), AlipayUser::getList));
         modelFields.addField(sendFriendCard = new SelectModelField("sendFriendCard", "送卡片好友列表(当前图鉴所有卡片)", new LinkedHashSet<>(), AlipayUser::getList));
-        modelFields.addField(usePropUNIVERSAL_CARD = new BooleanModelField("usePropUNIVERSAL_CARD", "使用道具 | 万能卡", false));
+
+        // 道具组类型：使用你刚刚定义的列表提供者
+        modelFields.addField(usepropGroup = new SelectModelField("usepropGroup", "使用道具类型", new LinkedHashSet<>(), listPropGroupOptions()));
+
         modelFields.addField(usePropUNIVERSALCARDType = new ChoiceModelField("usePropUNIVERSALCARDType", "万能卡 | 使用方式", UniversalCardUseType.EXCLUDE_CURRENT, UniversalCardUseType.nickNames));
-        modelFields.addField(usePropaddCOLLECTTOFRIENDLIMIT = new BooleanModelField("usePropaddCOLLECTTOFRIENDLIMIT", "使用道具 | 抽好友卡道具", false));
         modelFields.addField(autoGenerateBook = new BooleanModelField("autoGenerateBook", "自动合成图鉴", false));
         return modelFields;
     }
@@ -265,69 +282,147 @@ public class AntDodo extends ModelTask {
             Log.printStackTrace(TAG, "AntDodo ReceiveTaskAward 错误:",t); // 打印异常栈
         }
     }
+
+
     public void propList() {
-        try {
-            String s = AntDodoRpcCall.propList();
-            JSONObject jo = new JSONObject(s);
-            if (ResChecker.checkRes(TAG, jo)) {
+            try {
+                // 获取道具列表
+                String s = AntDodoRpcCall.propList();
+                JSONObject jo = new JSONObject(s);
+                if (!ResChecker.checkRes(TAG, jo))
+                {
+                    Log.error(TAG, "获取道具列表失败:"+jo);
+                    return;
+                }
+
                 JSONArray propList = jo.getJSONObject("data").getJSONArray("propList");
+
+                // --- A. 初始进度检查 (针对当前图鉴) ---
+                int currentCount = 0;
+                int totalCount = 0;
+                try {
+                    JSONObject homeJo = new JSONObject(AntDodoRpcCall.homePage());
+                    JSONObject homeData = homeJo.optJSONObject("data");
+                    if (homeData != null) {
+                        currentCount = homeData.optInt("curCollectionCategoryCount");
+                        JSONObject animalBook = homeData.optJSONObject("animalBook");
+                        if (animalBook != null) {
+                            totalCount = animalBook.optInt("totalCount");
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.record(TAG, "获取初始进度失败，将尝试默认抽卡");
+                }
+
+                // 标记位：如果一开始就满了，后面 COLLECT_ANIMAL 直接跳过
+                boolean isBookFull = (totalCount > 0 && currentCount >= totalCount);
+
+                // 获取 UI 配置 (用户勾选了哪些类型的道具自动使用)
+                Set<String> selectedConfigs = usepropGroup.getValue();
+                if (selectedConfigs == null) return;
+
                 for (int i = 0; i < propList.length(); i++) {
                     JSONObject prop = propList.getJSONObject(i);
-
-                    // 注意：JSON 里的 propType 有多种（例如 UNIVERSAL_CARD_7_DAYS）
-                    // 我们通过 propConfig 里的 propGroup 来分类更稳妥
                     JSONObject config = prop.optJSONObject("propConfig");
-                    String propGroup = config != null ? config.optString("propGroup") : "";
+                    String currentPropGroup = config != null ? config.optString("propGroup") : "";
                     String propType = prop.getString("propType");
-
-                    // 拿到该类道具的所有 ID 列表
                     JSONArray propIdList = prop.getJSONArray("propIdList");
                     int holdsNum = prop.getInt("holdsNum");
 
                     if (holdsNum <= 0) continue;
 
-                    // --- 逻辑分支开始 ---
+                    // --- 逻辑分发 ---
 
-                    // 1. 万能卡逻辑
-                    if ("UNIVERSAL_CARD".equals(propGroup) && usePropUNIVERSAL_CARD.getValue()) {
+                    // 1. 万能卡逻辑 (UNIVERSAL_CARD)
+                    if (PropGroupType.UNIVERSAL_CARD.equals(currentPropGroup) &&
+                            selectedConfigs.contains(PropGroupType.UNIVERSAL_CARD)) {
+                        if (isBookFull) continue;
+
                         for (int j = 0; j < propIdList.length(); j++) {
                             String pId = propIdList.getString(j);
-                            // 寻找缺失的动物 ID
-                            String animalId = getTargetAnimalIdForUniversalCard();
+                            String animalId = getTargetAnimalIdForUniversalCard(); // 你原有的找缺失ID函数
                             if (!animalId.isEmpty()) {
-                                // 调用带 animalId 的消耗方法
                                 String res = AntDodoRpcCall.consumeProp(pId, propType, animalId);
                                 if (ResChecker.checkRes(TAG, res)) {
-                                    Log.forest( "万能卡使用成功，补全动物ID: " + animalId);
+                                    currentCount++; // 万能卡必中新卡
+                                    if (currentCount >= totalCount) isBookFull = true;
+                                    Log.forest("万能卡使用成功，补全动物ID: " + animalId + " | 进度: " + currentCount + "/" + totalCount);
                                 }
-                                GlobalThreadPools.sleepCompat(2*1000L);
+                                GlobalThreadPools.sleepCompat(2000L);
                             }
                         }
                     }
 
-                    // 2. 抽好友卡道具逻辑 (判断 UI 开关)
-                    else if ("ADD_COLLECT_TO_FRIEND_LIMIT".equals(propGroup)) {
-                        if (usePropaddCOLLECTTOFRIENDLIMIT.getValue()) {
-                            for (int j = 0; j < propIdList.length(); j++) {
-                                String pId = propIdList.getString(j);
-                                // 调用不带 animalId 的专门方法
-                                String res = AntDodoRpcCall.consumePropForFriend(pId, propType);
-                                if (ResChecker.checkRes(TAG, new JSONObject(res))) {
-                                    Log.record(TAG, "成功使用 [抽好友卡道具]");
-                                }
-                                GlobalThreadPools.sleepCompat(2*1000L);
+                    // 2. 好友抽卡逻辑 (ADD_COLLECT_TO_FRIEND_LIMIT)
+                    else if (PropGroupType.ADD_COLLECT_TO_FRIEND_LIMIT.equals(currentPropGroup) &&
+                            selectedConfigs.contains(PropGroupType.ADD_COLLECT_TO_FRIEND_LIMIT)) {
+                        for (int j = 0; j < propIdList.length(); j++) {
+                            String pId = propIdList.getString(j);
+                            String res = AntDodoRpcCall.consumePropForFriend(pId, propType);
+                            if (ResChecker.checkRes(TAG, res)) {
+                                Log.record(TAG, "成功使用 [好友抽卡道具]");
                             }
+                            GlobalThreadPools.sleepCompat(2000L);
                         }
                     }
 
-                    // 3. 其他基础道具 (按需扩展)
+                    // 3. 普通抽卡券逻辑 (COLLECT_ANIMAL)
+                    else if (PropGroupType.COLLECT_ANIMAL.equals(currentPropGroup) &&
+                            selectedConfigs.contains(PropGroupType.COLLECT_ANIMAL)) {
+
+                        for (int j = 0; j < propIdList.length(); j++) {
+                            if (isBookFull) {
+                                Log.record(TAG, "图鉴已集满，自动关停后续抽卡动作");
+                                break;
+                            }
+
+                            String pId = propIdList.getString(j);
+                            String res = AntDodoRpcCall.consumeProp(pId, propType, null);
+
+                            if (ResChecker.checkRes(TAG, res)) {
+                                try {
+                                    JSONObject resJo = new JSONObject(res);
+                                    JSONObject data = resJo.optJSONObject("data");
+                                    if (data == null) continue;
+
+                                    // 提取道具名
+                                    String pName = data.optJSONObject("propConfig").optString("propName", "抽卡道具");
+
+                                    JSONObject useResult = data.optJSONObject("useResult");
+                                    if (useResult != null) {
+                                        JSONObject animal = useResult.optJSONObject("animal");
+                                        String ecosystem = animal != null ? animal.optString("ecosystem") : "当前特辑";
+                                        String animalName = animal != null ? animal.optString("name") : "未知物种";
+
+                                        // 解析是否新卡并更新进度
+                                        JSONObject collectDetail = useResult.optJSONObject("collectDetail");
+                                        boolean isNew = collectDetail != null && collectDetail.optBoolean("newCard");
+
+                                        if (isNew) {
+                                            currentCount++;
+                                            if (currentCount >= totalCount) isBookFull = true;
+                                        }
+
+                                        Log.forest(String.format("使用[%s] 抽到: %s-%s%s | 进度: %d/%d",
+                                                pName, ecosystem, animalName, (isNew ? " [新!]" : " (重复)"),
+                                                currentCount, totalCount));
+                                    }
+                                } catch (Throwable t) {
+                                    Log.printStackTrace(TAG, "解析抽卡结果 JSON 异常", t);
+                                }
+                            } else {
+                                Log.error(TAG, "使用道具请求失败: " + res);
+                            }
+                            GlobalThreadPools.sleepCompat(2000L);
+                        }
+                    }
 
                 }
+            } catch (Throwable t) {
+                Log.printStackTrace(TAG, "propList 处理异常", t);
             }
-        } catch (Throwable t) {
-            Log.printStackTrace(TAG, "propList 处理异常", t);
         }
-    }
+
 
     /**
      * 发送神奇物种卡片

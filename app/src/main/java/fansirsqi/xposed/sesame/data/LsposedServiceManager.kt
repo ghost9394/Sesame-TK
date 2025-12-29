@@ -7,9 +7,9 @@ import io.github.libxposed.service.XposedServiceHelper
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicReference
 
-object ServiceManager {
+object LsposedServiceManager {
 
-    private const val TAG = "ServiceManager"
+    private const val TAG = "LsposedServiceManager"
 
     /** 当前连接状态，线程安全 */
     private val _connectionState = AtomicReference<ConnectionState>(ConnectionState.Connecting)

@@ -10,8 +10,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import android.widget.Toast
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -33,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import fansirsqi.xposed.sesame.BuildConfig
 import fansirsqi.xposed.sesame.ICallback
 import fansirsqi.xposed.sesame.ICommandService
+import fansirsqi.xposed.sesame.util.ToastUtil
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -49,7 +48,7 @@ fun DeviceInfoCard(info: Map<String, String>) {
             .padding(8.dp),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(32.dp)) {
             info.forEach { (label, value) ->
                 when (label) {
                     "Verify ID" -> {
@@ -62,14 +61,13 @@ fun DeviceInfoCard(info: Map<String, String>) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .clickable { showFull = !showFull }
                                 .combinedClickable(
                                     onClick = { showFull = !showFull },
                                     onLongClick = {
                                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                         val clip = ClipData.newPlainText("Android ID", value)
                                         clipboard.setPrimaryClip(clip)
-                                        Toast.makeText(context, "Verify ID copied", Toast.LENGTH_SHORT).show()
+                                        ToastUtil.showToast("Verify ID copied")
                                     }
                                 )
                         )
@@ -79,7 +77,7 @@ fun DeviceInfoCard(info: Map<String, String>) {
                         Text(text = "$label: $value", fontSize = 14.sp)
                     }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(1.dp))
             }
         }
     }
@@ -163,7 +161,7 @@ object DeviceInfoUtil {
 
         try {
             service.executeCommand(command, callback)
-          //  service.executeCommand("input swipe 205 1587 1172 1587 500", callback)
+            //  service.executeCommand("input swipe 205 1587 1172 1587 500", callback)
             withTimeoutOrNull(TIMEOUT_MS) { deferred.await() } ?: ""
         } catch (_: Exception) {
             ""
@@ -233,7 +231,7 @@ object DeviceInfoUtil {
             "Android Version" to "${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})",
             "Verify ID" to vid,
             "Captcha Permission" to permissionStatus,
-            "Module Version" to "v${BuildConfig.VERSION_NAME}",
+            "Module Version" to "v${BuildConfig.VERSION_NAME} ${BuildConfig.VERSION_CODE}",
             "Module Build" to "${BuildConfig.BUILD_DATE} ${BuildConfig.BUILD_TIME}"
         )
     }

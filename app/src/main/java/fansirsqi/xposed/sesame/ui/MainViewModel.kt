@@ -4,18 +4,19 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import fansirsqi.xposed.sesame.data.ConnectionState
+import fansirsqi.xposed.sesame.data.LsposedServiceManager
 import fansirsqi.xposed.sesame.data.RunType
-import fansirsqi.xposed.sesame.data.ServiceManager
-import fansirsqi.xposed.sesame.data.ViewAppInfo
 import fansirsqi.xposed.sesame.entity.UserEntity
 import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.newutil.IconManager
 import fansirsqi.xposed.sesame.util.AssetUtil
-import fansirsqi.xposed.sesame.util.Detector
 import fansirsqi.xposed.sesame.util.FansirsqiUtil
+import fansirsqi.xposed.sesame.util.FansirsqiUtil.getFolderList
 import fansirsqi.xposed.sesame.util.Files
 import fansirsqi.xposed.sesame.util.maps.UserMap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,6 +49,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _userList = MutableStateFlow<List<UserEntity>>(emptyList())
     val userList: StateFlow<List<UserEntity>> = _userList.asStateFlow()
 
+    // 1. 新增一个 Loading 状态
+    private val _isOneWordLoading = MutableStateFlow(false)
+    val isOneWordLoading = _isOneWordLoading.asStateFlow()
+
+    // 🔥 1. 将监听器提取为成员变量
+    private val serviceListener: (ConnectionState) -> Unit = { _ ->
+        checkServiceState()
+    }
+
+
     // 初始化标志位
     private var isInitialized = false
 
@@ -65,21 +76,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             // 2. 拷贝资源文件 (耗时 IO 操作)
             copyAssets()
-
-            // 3. 加载 Native 库 (为了安全，切换到主线程加载)
-            withContext(Dispatchers.Main) {
-                initDetector()
-            }
-
             // 4. 加载业务数据
             reloadUserConfigs() // 加载用户列表
             fetchOneWord()      // 获取一言
 
-            // 5. 监听 LSPosed 服务连接状态
-            ServiceManager.addConnectionListener {
-                checkServiceState()
-            }
+            // 🔥 2. 使用成员变量注册
+            LsposedServiceManager.addConnectionListener(serviceListener)
+
         }
+    }
+
+    // 🔥 3. 在 ViewModel 销毁时移除监听器
+    override fun onCleared() {
+        super.onCleared()
+        LsposedServiceManager.removeConnectionListener(serviceListener)
+        Log.d(TAG, "ViewModel cleared, listener removed.")
     }
 
     /**
@@ -87,8 +98,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun initEnvironment() {
         try {
-            ViewAppInfo.init(getApplication())
-            ServiceManager.init()
+            LsposedServiceManager.init()
             DataStore.init(Files.CONFIG_DIR)
         } catch (e: Exception) {
             Log.e(TAG, "Environment init failed", e)
@@ -113,29 +123,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * 加载 Native 探测库
-     */
-    private fun initDetector() {
-        try {
-            Detector.loadLibrary("checker")
-            Detector.initDetector(getApplication())
-        } catch (e: Exception) {
-            Log.e(TAG, "load libSesame error: ${e.message}")
-        }
-    }
 
     /**
      * 获取一言
      */
     fun fetchOneWord() {
         viewModelScope.launch {
-            _oneWord.value = "😡 正在获取句子，请稍后……"
-            // 切换到 IO 线程进行网络请求
+            // 2. 开始加载：设置状态为 true
+            _isOneWordLoading.value = true
+
+            // 模拟一点延迟，防止请求太快导致 loading 闪烁（可选优化）
+            val startTime = System.currentTimeMillis()
+
             val result = withContext(Dispatchers.IO) {
                 FansirsqiUtil.getOneWord()
             }
+
+            val elapsedTime = System.currentTimeMillis() - startTime
+            if (elapsedTime < 2500) {
+                delay(500 - elapsedTime)
+            }
+
+            // 3. 加载结束：更新文本并关闭 Loading
             _oneWord.value = result
+            _isOneWordLoading.value = false
         }
     }
 
@@ -154,7 +165,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 // 2. 获取配置文件夹列表
-                val configFiles = FansirsqiUtil.getFolderList(Files.CONFIG_DIR.absolutePath)
+                val configFiles = verifuids
                 val newList = mutableListOf<UserEntity>()
 
                 for (userId in configFiles) {
@@ -177,13 +188,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 //                        newList.add(fallbackEntity)
 //                    }
                 }
-
                 // 更新状态流
                 _userList.value = newList
-
                 // 顺便刷新一下服务状态，确保激活用户显示正确
                 checkServiceState()
-
             } catch (e: Exception) {
                 Log.e(TAG, "Error reloading user configs", e)
             }
@@ -193,9 +201,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * 检查 LSPosed 服务连接状态并更新 UI
      */
-    private fun checkServiceState() {
-        val activated = ServiceManager.isModuleActivated
-
+    fun checkServiceState() {
+        val activated = LsposedServiceManager.isModuleActivated
+        Log.d(TAG, "lspframeworkName: ${LsposedServiceManager.service?.frameworkName}")
+        Log.d(TAG, "lspframeworkVersion: ${LsposedServiceManager.service?.frameworkVersion}")
+        Log.d(TAG, "lspapiVersion: ${LsposedServiceManager.service?.apiVersion}")
         // 尝试从 DataStore 读取当前激活的用户信息
         // 这里的 DataStore 必须已经 init 完毕
         val activeUserEntity = try {
@@ -203,13 +213,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } catch (_: Exception) {
             null
         }
-
         if (activated) {
             _runType.value = RunType.ACTIVE
         } else {
             _runType.value = RunType.LOADED
         }
-
         _activeUser.value = activeUserEntity
     }
 
@@ -220,5 +228,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             IconManager.syncIconState(getApplication(), isHidden)
         }
+    }
+
+    companion object {
+        val verifuids: List<String> = getFolderList(Files.CONFIG_DIR.absolutePath)
+        var verifyId: String = "待施工🚧..."
+
     }
 }
