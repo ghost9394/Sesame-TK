@@ -37,7 +37,7 @@ abstract class BaseCaptchaHandler {
         private const val SLIDE_START_OFFSET = 25 // 滑动起始位置偏移量（像素）
         private const val SLIDE_END_MARGIN = 20   // 滑动结束位置距离右侧的边距（像素）
         private const val SLIDE_DURATION_MIN = 400L // 最小滑动持续时间
-        private const val SLIDE_DURATION_MAX = 800L // 最大滑动持续时间
+        private const val SLIDE_DURATION_MAX = 600L // 最大滑动持续时间
 
         // 滑动后延迟检查是否成功
         private const val POST_SLIDE_CHECK_DELAY_MS = 2000L
@@ -77,7 +77,7 @@ abstract class BaseCaptchaHandler {
         }
         try {
             val slideTextInDialog = findSlideTextInDialog() ?: run {
-                Log.captcha(TAG, "未找到滑动验证文本，跳过处理")
+               // Log.captcha(TAG, "未找到滑动验证文本，跳过处理")
                 return false // 未找到关键视图，返回 false 让其他处理器尝试
             }
             Log.captcha(TAG, "发现滑动验证文本: ${slideTextInDialog.getText()}")
@@ -146,7 +146,7 @@ abstract class BaseCaptchaHandler {
     private fun calculateSlideCoordinates(activity: Activity, sliderView: android.view.View): SlideCoordinates? {
         // 获取滑动区域的整体容器（滑块的父容器）
         val slideContainer = sliderView.parent as? android.view.ViewGroup ?: run {
-            Log.captcha(TAG, "未能找到滑块容器")
+          //  Log.captcha(TAG, "未能找到滑块容器")
             return null
         }
         
@@ -187,7 +187,6 @@ abstract class BaseCaptchaHandler {
             endX = maxEndX
             Log.captcha(TAG, "调整滑动终点以适配屏幕边界")
         }
-        
         // 确保滑动距离足够（至少滑块宽度的1.5倍）
         val minSlideDistance = sliderWidth * 1.5f
         val actualSlideDistance = endX - startX
@@ -195,15 +194,20 @@ abstract class BaseCaptchaHandler {
             endX = startX + minSlideDistance + Random.nextInt(-3, 4) // 添加随机偏移
             Log.captcha(TAG, "调整滑动距离至最小要求: ${minSlideDistance}px")
         }
-        
         val endY = startY // 保持水平滑动
-        
         // 输出详细的调试信息
         Log.captcha(TAG, "屏幕信息: 尺寸=${screenWidth}x$screenHeight")
         Log.captcha(TAG, "滑动区域信息: 容器位置=[$containerX,$containerY], 尺寸=${containerWidth}x$containerHeight")
         Log.captcha(TAG, "滑块信息: 位置=[$sliderX,$sliderY], 尺寸=${sliderWidth}x${sliderHeight}")
         Log.captcha(TAG, "计算结果: 起点=[$startX,$startY], 终点=[$endX,$endY], 滑动距离=${endX-startX}px")
-        
+
+        ApplicationHook.sendBroadcastShell(
+            getSlidePathKey(),
+            "input swipe " +
+                "${startX.toInt()} ${startY.toInt()} " +
+                "${endX.toInt()} ${endY.toInt()} " +
+                Random.nextLong(SLIDE_DURATION_MIN, SLIDE_DURATION_MAX + 1)
+        )
         return SlideCoordinates(startX, startY, endX, endY)
     }
 
@@ -228,7 +232,7 @@ abstract class BaseCaptchaHandler {
      */
     private fun findSlideTextInDialog(): SimpleViewImage? {
         return try {
-            Log.captcha(TAG, "尝试通过 XPath 查找滑动验证文本: $SLIDE_VERIFY_TEXT_XPATH")
+          //  Log.captcha(TAG, "尝试通过 XPath 查找滑动验证文本: $SLIDE_VERIFY_TEXT_XPATH")
             SimplePageManager.tryGetTopView(SLIDE_VERIFY_TEXT_XPATH)
         } catch (e: Exception) {
             Log.captcha(TAG, "由于异常导致查找验证码文本失败: ${e.stackTraceToString()}")

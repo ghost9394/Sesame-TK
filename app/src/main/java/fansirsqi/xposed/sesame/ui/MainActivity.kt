@@ -1,6 +1,7 @@
 package fansirsqi.xposed.sesame.ui
 
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -12,8 +13,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +35,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.rounded.Agriculture
 import androidx.compose.material.icons.rounded.AlignVerticalTop
 import androidx.compose.material.icons.rounded.BugReport
@@ -37,10 +44,12 @@ import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Forest
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -58,9 +67,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,7 +80,7 @@ import fansirsqi.xposed.sesame.BuildConfig
 import fansirsqi.xposed.sesame.R
 import fansirsqi.xposed.sesame.SesameApplication.Companion.hasPermissions
 import fansirsqi.xposed.sesame.SesameApplication.Companion.preferencesKey
-import fansirsqi.xposed.sesame.data.RunType
+import fansirsqi.xposed.sesame.entity.UserEntity
 import fansirsqi.xposed.sesame.newui.DeviceInfoCard
 import fansirsqi.xposed.sesame.newui.DeviceInfoUtil
 import fansirsqi.xposed.sesame.newutil.IconManager
@@ -84,6 +93,7 @@ import fansirsqi.xposed.sesame.util.Files
 import fansirsqi.xposed.sesame.util.Log
 import fansirsqi.xposed.sesame.util.PermissionUtil
 import fansirsqi.xposed.sesame.util.ToastUtil
+import kotlinx.coroutines.delay
 import rikka.shizuku.Shizuku
 import rikka.shizuku.ShizukuProvider
 import java.io.File
@@ -118,24 +128,23 @@ class MainActivity : BaseActivity() {
         val prefs = getSharedPreferences(preferencesKey, MODE_PRIVATE)
         IconManager.syncIconState(this, prefs.getBoolean("is_icon_hidden", false))
 
-        // 4. 安装水印 (这是一个 View，挂载到 Window 上，不影响 Compose)
-//        watermarkView = WatermarkView.install(this)
 
         // 5. 设置 Compose 内容 (替代 setContentView)
         setContent {
 // 收集 ViewModel 状态
             val oneWord by viewModel.oneWord.collectAsStateWithLifecycle()
-            val runType by viewModel.runType.collectAsStateWithLifecycle()
             val activeUser by viewModel.activeUser.collectAsStateWithLifecycle()
             val userList by viewModel.userList.collectAsStateWithLifecycle()
+            // ✨ 1. 从 ViewModel 收集模块状态
+            val moduleStatus by viewModel.moduleStatus.collectAsStateWithLifecycle()
 
 
             AppTheme {
                 WatermarkLayer {
                     MainScreen(
                         oneWord = oneWord,
-                        runType = runType,
                         activeUserName = activeUser?.showName ?: "未载入^o^ 重启支付宝看看👀",
+                        moduleStatus = moduleStatus, // ✨ 传递状态
                         viewModel = viewModel,
                         onEvent = { event -> handleEvent(event, userList) } // 处理点击事件
                     )
@@ -181,7 +190,7 @@ class MainActivity : BaseActivity() {
     /**
      * 统一处理事件
      */
-    private fun handleEvent(event: MainUiEvent, userList: List<fansirsqi.xposed.sesame.entity.UserEntity>) {
+    private fun handleEvent(event: MainUiEvent, userList: List<UserEntity>) {
         when (event) {
             MainUiEvent.RefreshOneWord -> viewModel.fetchOneWord()
             MainUiEvent.OpenForestLog -> openLogFile(Files.getForestLogFile())
@@ -316,6 +325,85 @@ class MainActivity : BaseActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StatusCard(
+    status: MainViewModel.ModuleStatus,
+    expanded: Boolean, // ✨ 接收展开状态
+    onClick: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.clickable(onClick = onClick),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor =
+                when (status) {
+                    is MainViewModel.ModuleStatus.Activated -> MaterialTheme.colorScheme.secondaryContainer
+                    is MainViewModel.ModuleStatus.NotActivated -> MaterialTheme.colorScheme.errorContainer
+                    is MainViewModel.ModuleStatus.Loading -> MaterialTheme.colorScheme.surfaceVariant
+                }
+        )
+    ) {
+        // 使用 Column 包裹所有内容，以便添加可展开部分
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // --- 顶部固定显示部分 ---
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                when (status) {
+                    is MainViewModel.ModuleStatus.Activated -> {
+                        Icon(Icons.Outlined.CheckCircle, "已激活")
+                        Column(Modifier.padding(start = 20.dp)) {
+                            Text(text = "${status.frameworkName} ${status.frameworkVersion}", style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.height(4.dp))
+                            Text(text = "Actived API ${status.apiVersion}", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+
+                    is MainViewModel.ModuleStatus.NotActivated -> {
+                        Icon(Icons.Outlined.Warning, "未激活")
+                        Column(Modifier.padding(start = 20.dp)) {
+                            Text(text = "如果你是免root用户,请忽略此状态", style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.height(4.dp))
+                            Text(text = "点击展开帮助", style = MaterialTheme.typography.bodyMedium) // ✨ 提示语更新
+                        }
+                    }
+
+                    is MainViewModel.ModuleStatus.Loading -> {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Column(Modifier.padding(start = 20.dp)) {
+                            Text(text = "正在检查模块状态...", style = MaterialTheme.typography.titleMedium)
+                        }
+                    }
+                }
+            }
+
+            // --- ✨ 可展开的帮助信息部分 ---
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(animationSpec = tween(300)),
+                exit = shrinkVertically(animationSpec = tween(300))
+            ) {
+                Column(modifier = Modifier.padding(top = 16.dp)) {
+                    Text(
+                        text = "故障排查指南",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "请确认您已在 LSPosed Manager (或类似框架) 中：\n1. 启用了本模块。\n2. 在作用域中勾选了支付宝。\n3. 重启了支付宝进程。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineHeight = 20.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
 /**
  * 纯 Compose UI 实现
  * 不再依赖 XML，直接在这里构建界面
@@ -324,17 +412,19 @@ class MainActivity : BaseActivity() {
 @Composable
 fun MainScreen(
     oneWord: String,
-    runType: RunType,
     activeUserName: String,
+    moduleStatus: MainViewModel.ModuleStatus, // ✨ 接收状态
     viewModel: MainViewModel, // 建议直接传 VM 或者把 isLoading 传进来
-    onEvent: (MainActivity.MainUiEvent) -> Unit
+    onEvent: (MainActivity.MainUiEvent) -> Unit,
 ) {
+//    ✨ 3. 在 MainScreen 中管理 StatusCard 的展开状态
+    var isStatusCardExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     val isOneWordLoading by viewModel.isOneWordLoading.collectAsStateWithLifecycle()//获取一言加载状态
 
     // 获取当前图标隐藏状态 (从 SP 读取，这里简单用 remember 读取一次，更严谨应该从 ViewModel 读)
-    val prefs = context.getSharedPreferences(preferencesKey, android.content.Context.MODE_PRIVATE)
+    val prefs = context.getSharedPreferences(preferencesKey, Context.MODE_PRIVATE)
     var isIconHidden by remember { mutableStateOf(prefs.getBoolean("is_icon_hidden", false)) }
 
     // 控制下拉菜单显示
@@ -345,31 +435,24 @@ fun MainScreen(
         value = DeviceInfoUtil.showInfo(verifyId, context)
 
         repeat(1) {
-            kotlinx.coroutines.delay(200)
+            delay(200)
             value = DeviceInfoUtil.showInfo(verifyId, context)
         }
     }
 
     Scaffold(
+        // 标题栏
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "Module [${runType.nickName}]",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = when (runType) {
-                                RunType.DISABLE -> Color(0xFFE57373)
-                                RunType.ACTIVE -> Color(0xFF81C784)
-                                RunType.LOADED -> MaterialTheme.colorScheme.onSurface
-                            }
-                        )
-                        Text(
-                            text = "当前载入: $activeUserName",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+//                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+
+                    Text(
+                        text = "当前载入: $activeUserName",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+//                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
@@ -441,20 +524,37 @@ fun MainScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
+
+                StatusCard(
+                    status = moduleStatus,
+                    expanded = isStatusCardExpanded,
+                    onClick = {
+                        // ✨ 点击时，仅当未激活状态才切换展开状态
+                        if (moduleStatus is MainViewModel.ModuleStatus.NotActivated) {
+                            isStatusCardExpanded = !isStatusCardExpanded
+                        } else {
+                            ToastUtil.showToast(oneWord)
+                            // 对于已激活状态，可以考虑弹一个 Toast
+                            // (为了简单，这里暂时不做任何事)
+                        }
+                    }
+                )
+
+
                 if (deviceInfoMap != null) {
                     DeviceInfoCard(deviceInfoMap!!)
                 } else {
                     CircularProgressIndicator()
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(2.dp))
 
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .fillMaxWidth()
                         // 🔥 核心防抖：设置最小高度 (例如 60dp)，保证即使内容变化，占据的空间也不会忽大忽小
-                        .heightIn(min = 100.dp)
+                        .heightIn(min = 130.dp)
                         .padding(8.dp)
                         .clip(RoundedCornerShape(8.dp)) // 点击水波纹圆角
                         .clickable(
@@ -492,7 +592,7 @@ fun MainScreen(
                             // 状态 B: 显示文本
                             Text(
                                 text = oneWord,
-                                fontSize = 16.sp,
+                                fontSize = 14.sp,
                                 style = MaterialTheme.typography.bodyMedium,
                                 textAlign = TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant

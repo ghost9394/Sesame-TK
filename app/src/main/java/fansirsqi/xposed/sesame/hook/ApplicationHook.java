@@ -17,6 +17,7 @@ import fansirsqi.xposed.sesame.hook.keepalive.SmartSchedulerManager;
 import fansirsqi.xposed.sesame.hook.server.ModuleHttpServerManager;
 import fansirsqi.xposed.sesame.hook.simple.SimplePageManager;
 import fansirsqi.xposed.sesame.hook.internal.LocationHelper;
+import fansirsqi.xposed.sesame.util.*;
 import kotlin.Unit;
 import lombok.Setter;
 
@@ -52,17 +53,7 @@ import fansirsqi.xposed.sesame.newutil.DataStore;
 import fansirsqi.xposed.sesame.task.MainTask;
 import fansirsqi.xposed.sesame.task.ModelTask;
 import fansirsqi.xposed.sesame.task.TaskRunnerAdapter;
-import fansirsqi.xposed.sesame.util.AssetUtil;
-import fansirsqi.xposed.sesame.util.Detector;
-import fansirsqi.xposed.sesame.util.Files;
-import fansirsqi.xposed.sesame.util.Log;
-import fansirsqi.xposed.sesame.util.NetworkUtils;
-import fansirsqi.xposed.sesame.util.Notify;
-import fansirsqi.xposed.sesame.util.PermissionUtil;
-import fansirsqi.xposed.sesame.util.TimeUtil;
-import fansirsqi.xposed.sesame.util.WakeLockManager;
 import fansirsqi.xposed.sesame.util.maps.UserMap;
-import fansirsqi.xposed.sesame.util.GlobalThreadPools;
 import fansirsqi.xposed.sesame.hook.rpc.debug.DebugRpc;
 import io.github.libxposed.api.XposedInterface;
 import io.github.libxposed.api.XposedModuleInterface;
@@ -520,7 +511,7 @@ public class ApplicationHook {
 
                     // LocationHelper初始化
                     LocationHelper.INSTANCE.init(classLoader);
-                    
+
                     // 异步获取位置信息
                     LocationHelper.requestLocation(locationJson -> {
                         Log.debug(TAG, "📍 获取到位置信息: " + locationJson);

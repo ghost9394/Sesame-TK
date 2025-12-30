@@ -6,7 +6,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import fansirsqi.xposed.sesame.data.ConnectionState
 import fansirsqi.xposed.sesame.data.LsposedServiceManager
-import fansirsqi.xposed.sesame.data.RunType
 import fansirsqi.xposed.sesame.entity.UserEntity
 import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.newutil.IconManager
@@ -17,8 +16,10 @@ import fansirsqi.xposed.sesame.util.Files
 import fansirsqi.xposed.sesame.util.maps.UserMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -29,17 +30,12 @@ import kotlinx.coroutines.withContext
  */
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val TAG = "MainViewModel"
-
-    // --- UI 状态流 (StateFlow) ---
 
     // 一言 (初始状态)
     private val _oneWord = MutableStateFlow("正在获取句子...")
     val oneWord: StateFlow<String> = _oneWord.asStateFlow()
 
     // 模块运行状态 (未激活/已激活/已加载)
-    private val _runType = MutableStateFlow(RunType.DISABLE)
-    val runType: StateFlow<RunType> = _runType.asStateFlow()
 
     // 当前激活的用户 (LSPosed 注入的那个)
     private val _activeUser = MutableStateFlow<UserEntity?>(null)
@@ -52,6 +48,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // 1. 新增一个 Loading 状态
     private val _isOneWordLoading = MutableStateFlow(false)
     val isOneWordLoading = _isOneWordLoading.asStateFlow()
+
+    // ✨ 1. 新增 StateFlow 暴露模块状态
+    private val _moduleStatus = MutableStateFlow<ModuleStatus>(ModuleStatus.Loading)
+    val moduleStatus: StateFlow<ModuleStatus> = _moduleStatus.asStateFlow()
+
 
     // 🔥 1. 将监听器提取为成员变量
     private val serviceListener: (ConnectionState) -> Unit = { _ ->
@@ -122,6 +123,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             Log.e(TAG, "Asset copy error", e)
         }
     }
+
+
 
 
     /**
@@ -202,21 +205,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * 检查 LSPosed 服务连接状态并更新 UI
      */
     fun checkServiceState() {
-        val activated = LsposedServiceManager.isModuleActivated
-        Log.d(TAG, "lspframeworkName: ${LsposedServiceManager.service?.frameworkName}")
-        Log.d(TAG, "lspframeworkVersion: ${LsposedServiceManager.service?.frameworkVersion}")
-        Log.d(TAG, "lspapiVersion: ${LsposedServiceManager.service?.apiVersion}")
-        // 尝试从 DataStore 读取当前激活的用户信息
-        // 这里的 DataStore 必须已经 init 完毕
+        val newStatus = when (val connectionState = LsposedServiceManager.connectionState) {
+            is ConnectionState.Connected -> ModuleStatus.Activated(
+                frameworkName = connectionState.service.frameworkName,
+                frameworkVersion = connectionState.service.frameworkVersion,
+                apiVersion = connectionState.service.apiVersion
+            )
+
+            else -> ModuleStatus.NotActivated
+        }
+        _moduleStatus.value = newStatus
+
         val activeUserEntity = try {
             DataStore.get("activedUser", UserEntity::class.java)
         } catch (_: Exception) {
             null
-        }
-        if (activated) {
-            _runType.value = RunType.ACTIVE
-        } else {
-            _runType.value = RunType.LOADED
         }
         _activeUser.value = activeUserEntity
     }
@@ -230,9 +233,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ✨ 4. 定义 ViewModel 的状态和事件
+    sealed class ModuleStatus {
+        data object Loading : ModuleStatus()
+        data class Activated(
+            val frameworkName: String,
+            val frameworkVersion: String,
+            val apiVersion: Int
+        ) : ModuleStatus()
+
+        data object NotActivated : ModuleStatus()
+    }
+
+
+
     companion object {
+        val TAG = "MainViewModel"
         val verifuids: List<String> = getFolderList(Files.CONFIG_DIR.absolutePath)
         var verifyId: String = "待施工🚧..."
+
+        var lspService = LsposedServiceManager.service
 
     }
 }

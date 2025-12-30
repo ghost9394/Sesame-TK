@@ -50,7 +50,7 @@ object MotionEventSimulator {
                 dispatchTouchEvent(view, MotionEvent.ACTION_DOWN, startX, startY, downTime, downTime)
                 delay(Random.nextLong(30, 80)) // 按下后短暂延迟，更像人
                 // 2. 模拟 ACTION_MOVE 事件序列，构造滑动轨迹
-                val steps = 20 // 将滑动轨迹分为 20 步
+                val steps = 15 // 将滑动轨迹分为 15 步
                 val stepDuration = (duration - 100) / steps
                 val xStep = (endX - startX) / steps
                 val yStep = (endY - startY) / steps

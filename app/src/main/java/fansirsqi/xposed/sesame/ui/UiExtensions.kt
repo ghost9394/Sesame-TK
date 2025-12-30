@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
-import android.net.Uri
 import android.text.InputType
 import android.view.View
 import android.widget.EditText
@@ -14,6 +13,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
 import fansirsqi.xposed.sesame.BuildConfig
 import fansirsqi.xposed.sesame.entity.UserEntity
 import fansirsqi.xposed.sesame.util.Detector
@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit
  */
 fun Context.openUrl(url: String) {
     try {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
         startActivity(intent)
     } catch (_: Exception) {
         Toast.makeText(this, "未找到可用的浏览器", Toast.LENGTH_SHORT).show()
