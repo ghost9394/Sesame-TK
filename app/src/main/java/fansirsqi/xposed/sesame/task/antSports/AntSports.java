@@ -140,7 +140,7 @@ public class AntSports extends ModelTask {
                             }
                         }
                     });
-            Log.runtime(TAG, "hook readDailyStep successfully");
+            Log.record(TAG, "hook readDailyStep successfully");
         } catch (Throwable t) {
             Log.printStackTrace(TAG,"hook readDailyStep err:", t);
         }
@@ -250,7 +250,7 @@ public class AntSports extends ModelTask {
             }
 
         } catch (Throwable t) {
-            Log.runtime(TAG, "runJava error:");
+            Log.record(TAG, "runJava error:");
             Log.printStackTrace(TAG, t);
         } finally {
             Log.record(TAG, "执行结束-" + getName());
@@ -610,7 +610,7 @@ public class AntSports extends ModelTask {
                     }
                 }
             } else {
-                Log.runtime(TAG, s);
+                Log.record(TAG, s);
             }
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "receiveCoinAsset err:",t);
@@ -813,7 +813,7 @@ public class AntSports extends ModelTask {
                                         .getJSONArray("allPathBaseInfoList");
                                 join(loader, allPathBaseInfoList, otherAllPathBaseInfoList, "");
                             } else {
-                                Log.runtime(TAG, jo.getString("resultDesc"));
+                                Log.record(TAG, jo.getString("resultDesc"));
                             }
                         }
                     } else {
@@ -842,7 +842,7 @@ public class AntSports extends ModelTask {
                     join(loader, allPathBaseInfoList, otherAllPathBaseInfoList, firstJoinPathTitle);
                 }
             } else {
-                Log.runtime(TAG, jo.getString("resultDesc"));
+                Log.record(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "queryMyHomePage err:",t);
@@ -890,7 +890,7 @@ public class AntSports extends ModelTask {
                     Log.other("加入线路🚶🏻‍♂️[" + title + "]");
                     queryMyHomePage(loader);
                 } else {
-                    Log.runtime(TAG, jo.getString("resultDesc"));
+                    Log.record(TAG, jo.getString("resultDesc"));
                 }
             } else {
                 Log.record(TAG, "好像没有可走的线路了！");
@@ -916,7 +916,7 @@ public class AntSports extends ModelTask {
                     queryMyHomePage(loader);
                 }
             } else {
-                Log.runtime(TAG, jo.getString("resultDesc"));
+                Log.record(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "go err:",t);
@@ -1010,7 +1010,7 @@ public class AntSports extends ModelTask {
                 }
             } else {
                 Log.record(TAG);
-                Log.runtime(jo.getString("resultDesc"));
+                Log.record(jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "queryProjectList err:",t);
@@ -1024,7 +1024,7 @@ public class AntSports extends ModelTask {
             if (ResChecker.checkRes(TAG,jo)) {
                 Log.other("捐赠活动❤️[" + title + "][" + donateCharityCoin + "能量🎈]");
             } else {
-                Log.runtime(TAG, jo.getString("resultDesc"));
+                Log.record(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
             Log.printStackTrace(TAG,"donate err:", t);
@@ -1066,11 +1066,11 @@ public class AntSports extends ModelTask {
                     } else if (s.contains("已捐步")) {
                         Status.exchangeToday(Objects.requireNonNull(UserMap.INSTANCE.getCurrentUid()));
                     } else {
-                        Log.runtime(TAG, jo.getString("resultDesc"));
+                        Log.record(TAG, jo.getString("resultDesc"));
                     }
                 }
             } else {
-                Log.runtime(TAG, jo.getString("resultDesc"));
+                Log.record(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "queryWalkStep err:",t);
@@ -1183,12 +1183,12 @@ public class AntSports extends ModelTask {
                         Log.other("领取奖励🎖️[" + taskName + "]#" + award);
                     } else {
                         Log.record(TAG, "文体中心领取奖励");
-                        Log.runtime(jo.toString());
+                        Log.record(jo.toString());
                     }
                 }
             } else {
                 Log.record(TAG, "文体中心领取奖励");
-                Log.runtime(s);
+                Log.record(s);
             }
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "userTaskRightsReceive err:",t);
@@ -1226,7 +1226,7 @@ public class AntSports extends ModelTask {
                     pathMapJoin(title, pathId);
                 }
             } else {
-                Log.runtime(TAG, jo.getString("resultDesc"));
+                Log.record(TAG, jo.getString("resultDesc"));
             }
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "pathFeatureQuery err:",t);
@@ -1258,12 +1258,12 @@ public class AntSports extends ModelTask {
                         Log.other("文体宝箱🎁[" + award + "]");
                     } else {
                         Log.record(TAG, "文体中心开宝箱");
-                        Log.runtime(jo.toString());
+                        Log.record(jo.toString());
                     }
                 }
             } else {
                 Log.record(TAG, "文体中心开宝箱");
-                Log.runtime(s);
+                Log.record(s);
             }
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "pathMapHomepage err:",t);
@@ -1277,7 +1277,7 @@ public class AntSports extends ModelTask {
                 Log.other("加入线路🚶🏻‍♂️[" + title + "]");
                 pathFeatureQuery();
             } else {
-                Log.runtime(TAG, jo.toString());
+                Log.record(TAG, jo.toString());
             }
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "pathMapJoin err:",t);
@@ -1299,7 +1299,7 @@ public class AntSports extends ModelTask {
                     pathFeatureQuery();
                 }
             } else {
-                Log.runtime(TAG, s);
+                Log.record(TAG, s);
             }
         } catch (Throwable t) {
             Log.printStackTrace(TAG, "tiyubizGo err:",t);
@@ -1413,7 +1413,7 @@ public class AntSports extends ModelTask {
                     String responseData = AntSportsRpcCall.queryTrainItem();
                     JSONObject responseJson = new JSONObject(responseData);
                     if (!ResChecker.checkRes(TAG, responseJson)) {
-                        Log.runtime(TAG, "queryTrainItem rpc failed: " + responseJson.optString("resultDesc"));
+                        Log.record(TAG, "queryTrainItem rpc failed: " + responseJson.optString("resultDesc"));
                         return;
                     }
 
@@ -1425,7 +1425,7 @@ public class AntSports extends ModelTask {
 
                     JSONArray trainItemList = responseJson.optJSONArray("trainItemList");
                     if (bizId.isEmpty() || trainItemList == null || trainItemList.length() == 0) {
-                        Log.runtime(TAG, "queryTrainItem response missing bizId or trainItemList");
+                        Log.record(TAG, "queryTrainItem response missing bizId or trainItemList");
                         return;
                     }
 
@@ -1452,7 +1452,7 @@ public class AntSports extends ModelTask {
                     String trainMemberResponse = AntSportsRpcCall.trainMember(bizId, itemType, memberId, originBossId);
                     JSONObject trainMemberResponseJson = new JSONObject(trainMemberResponse);
                     if (!ResChecker.checkRes(TAG, trainMemberResponseJson)) {
-                        Log.runtime(TAG, "trainMember request failed: " + trainMemberResponseJson.optString("resultDesc"));
+                        Log.record(TAG, "trainMember request failed: " + trainMemberResponseJson.optString("resultDesc"));
                         return;
                     }
 

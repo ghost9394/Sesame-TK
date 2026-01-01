@@ -446,7 +446,7 @@ object Credit2101 {
 
 
             if (!ResChecker.checkRes(TAG, resp)) {
-                Log.runtime(TAG, "信用2101🗓[查询签到失败] resp=$resp")
+                Log.record(TAG, "信用2101🗓[查询签到失败] resp=$resp")
                 return
             }
             val jo = JSONObject(resp)
@@ -483,7 +483,7 @@ object Credit2101 {
                 if (resultCode == "SIGN_DAYS_NOT_ENOUGH") {
                     Log.record(TAG, "信用2101🗓[签到] 已领取签到奖励")
                 } else {
-                    Log.runtime(TAG, "信用2101🗓[签到失败] resp=$signResp")
+                    Log.record(TAG, "信用2101🗓[签到失败] resp=$signResp")
                 }
                 return
             }
@@ -547,7 +547,7 @@ object Credit2101 {
                 if (taskStatus == "INIT") {
                     val claimResp = Credit2101RpcCall.operateTask("TASK_CLAIM", taskConfigId)
                     if (claimResp.isEmpty()) {
-                        Log.runtime(TAG, "信用2101📋[任务领取失败] $taskName 返回为空")
+                        Log.record(TAG, "信用2101📋[任务领取失败] $taskName 返回为空")
                     } else {
                         val cJo = JSONObject(claimResp)
                         val ok = ResChecker.checkRes(TAG, cJo) &&
@@ -556,7 +556,7 @@ object Credit2101 {
                             claimCount++
                             Log.other( "信用2101📋[任务领取成功] $taskName ($taskConfigId)")
                         } else {
-                            Log.runtime(TAG, "信用2101📋[任务领取失败] $taskName resp=$claimResp")
+                            Log.record(TAG, "信用2101📋[任务领取失败] $taskName resp=$claimResp")
                         }
                     }
                     continue
@@ -579,7 +579,7 @@ object Credit2101 {
                         if (resultCode == "TASK_HAS_NO_AWARD") {
                             Log.record(TAG, "信用2101📋[任务奖励] $taskName 当前无奖励可领")
                         } else {
-                            Log.runtime(TAG, "信用2101📋[任务奖励领取失败] $taskName resp=$awardResp")
+                            Log.record(TAG, "信用2101📋[任务奖励领取失败] $taskName resp=$awardResp")
                         }
                         continue
                     }
@@ -1322,7 +1322,7 @@ object Credit2101 {
 
 
             if (!ResChecker.checkRes(TAG, queryResp)) {
-                Log.runtime(TAG, "信用2101📖[故事事件查询失败] resp=$queryResp")
+                Log.record(TAG, "信用2101📖[故事事件查询失败] resp=$queryResp")
                 return
             }
             val qJo = JSONObject(queryResp)
@@ -1340,7 +1340,7 @@ object Credit2101 {
 
 
             if (!ResChecker.checkRes(TAG, completeResp)) {
-                Log.runtime(TAG, "信用2101📖[故事事件完成失败] resp=$completeResp")
+                Log.record(TAG, "信用2101📖[故事事件完成失败] resp=$completeResp")
                 return
             }
             val cJo = JSONObject(completeResp)

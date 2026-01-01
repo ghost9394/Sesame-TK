@@ -86,7 +86,7 @@ class AntOrchard : ModelTask() {
             val indexJson = JSONObject(indexResponse)
 
             if (indexJson.optString("resultCode") != "100") {
-                Log.runtime(TAG, indexJson.optString("resultDesc", "orchardIndex 调用失败"))
+                Log.record(TAG, indexJson.optString("resultDesc", "orchardIndex 调用失败"))
                 return
             }
 
@@ -347,7 +347,7 @@ class AntOrchard : ModelTask() {
                                 }
                             }
                         } else {
-                            Log.runtime(TAG, jo3.toString())
+                            Log.record(TAG, jo3.toString())
                         }
                     } else {
                         Log.record(TAG, "七日礼包已领取")
@@ -474,7 +474,7 @@ class AntOrchard : ModelTask() {
                         .getInt("awardCount")
                     Log.farm("农场签到📅[获得肥料]#${awardCount}g")
                 } else {
-                    Log.runtime(TAG, joSign.toString())
+                    Log.record(TAG, joSign.toString())
                 }
             } else {
                 Log.record(TAG, "农场今日已签到")

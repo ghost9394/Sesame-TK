@@ -24,7 +24,6 @@ import fansirsqi.xposed.sesame.model.modelFieldExt.SelectAndCountModelField
 import fansirsqi.xposed.sesame.model.modelFieldExt.SelectModelField
 import fansirsqi.xposed.sesame.model.modelFieldExt.StringModelField
 import fansirsqi.xposed.sesame.newutil.DataStore
-import fansirsqi.xposed.sesame.newutil.DataStore.getOrCreate
 import fansirsqi.xposed.sesame.newutil.TaskBlacklist
 import fansirsqi.xposed.sesame.task.AnswerAI.AnswerAI
 import fansirsqi.xposed.sesame.task.ModelTask
@@ -219,6 +218,7 @@ class AntFarm : ModelTask() {
     private var chickenDiary: BooleanModelField? = null
     private var diaryTietie: BooleanModelField? = null
     private var collectChickenDiary: ChoiceModelField? = null
+    private lateinit var remainingTime: IntegerModelField
     private var enableChouchoule: BooleanModelField? = null
     private var enableChouchouleTime: StringModelField? = null // 抽抽乐执行时间
     private var listOrnaments: BooleanModelField? = null
@@ -417,6 +417,9 @@ class AntFarm : ModelTask() {
                 false
             ).also { useAccelerateToolContinue = it })
         modelFields.addField(
+            IntegerModelField("remainingTime", "饲料剩余时间大于多少时直接使用加速（分钟）（-1关闭）", 50).also { remainingTime = it }
+        )
+        modelFields.addField(
             BooleanModelField(
                 "useAccelerateToolWhenMaxEmotion",
                 "加速卡 | 仅在满状态时使用",
@@ -606,6 +609,24 @@ class AntFarm : ModelTask() {
             if (hireAnimal!!.value) {
                 hireAnimal()
             }
+
+            /* 为保证单次运行程序可以完成全部任务，而加速卡用完会消耗最多360g饲料，如果差360g满饲料，那肯定不能执行
+                游戏改分了，需要先把饲料任务完成，方便在连续用加速卡逻辑中领取饲料。
+             */
+            if (doFarmTask!!.value) {
+                // 这里设置判断，如果当日完成过一次饲料任务了，就不会在这个位置再进行饲料任务了。
+                if(!Status.hasFlagToday("farm::farmTaskFinished")) {
+                    // 检查是否到达执行时间
+                    if (TaskTimeChecker.isTimeReached(doFarmTaskTime?.value, "0830")) {
+                        doFarmTasks()
+                        tc.countDebug("饲料任务")
+                        Status.setFlagToday("farm::farmTaskFinished")
+                    } else {
+                        Log.record(TAG, "饲料任务未到执行时间，跳过")
+                    }
+                }
+            }
+
             handleAutoFeedAnimal()
             tc.countDebug("喂食")
 
@@ -625,16 +646,8 @@ class AntFarm : ModelTask() {
                 tc.countDebug("收取道具奖励")
             }
             if (recordFarmGame!!.value) {
-                for (time in farmGameTime!!.value) {
-                    if (TimeUtil.checkNowInTimeRange(time)) {
-                        recordFarmGame(GameType.starGame)
-                        recordFarmGame(GameType.jumpGame)
-                        recordFarmGame(GameType.flyGame)
-                        recordFarmGame(GameType.hitGame)
-                        break
-                    }
-                }
                 tc.countDebug("游戏改分(星星球、登山赛、飞行赛、揍小鸡)")
+                handleFarmGameLogic()
             }
             if (kitchen!!.value) {
                 // 检查小鸡是否在睡觉，如果在睡觉则跳过厨房功能
@@ -666,6 +679,7 @@ class AntFarm : ModelTask() {
             if (donation!!.value && Status.canDonationEgg(userId) && harvestBenevolenceScore >= 1) {
                 handleDonation(donationCount!!.value)
                 tc.countDebug("每日捐蛋")
+                Log.farm("今日捐蛋完成")
             }
 
 
@@ -675,6 +689,7 @@ class AntFarm : ModelTask() {
                 if (TaskTimeChecker.isTimeReached(doFarmTaskTime?.value, "0830")) {
                     doFarmTasks()
                     tc.countDebug("饲料任务")
+                    Status.setFlagToday("farm::farmTaskFinished")
                 } else {
                     Log.record(TAG, "饲料任务未到执行时间，跳过")
                 }
@@ -705,14 +720,8 @@ class AntFarm : ModelTask() {
 
             // 抽抽乐
             if (enableChouchoule!!.value) {
-                // 检查是否到达执行时间
-                if (TaskTimeChecker.isTimeReached(enableChouchouleTime?.value, "0900")) {
-                    val ccl = ChouChouLe()
-                    ccl.chouchoule()
-                    tc.countDebug("抽抽乐")
-                } else {
-                    Log.record(TAG, "抽抽乐未到执行时间，跳过")
-                }
+                tc.countDebug("抽抽乐")
+                handleChouChouLeLogic()
             }
 
             if (getFeed!!.value) {
@@ -722,7 +731,6 @@ class AntFarm : ModelTask() {
             //家庭
             if (family!!.value) {
                 //                family();
-
                 AntFarmFamily.run(familyOptions!!, notInviteList!!)
                 tc.countDebug("家庭任务")
             }
@@ -739,6 +747,16 @@ class AntFarm : ModelTask() {
             //小鸡睡觉&起床
             animalSleepAndWake()
             tc.countDebug("小鸡睡觉&起床")
+
+            /* 小鸡睡觉后领取饲料，先同步小鸡状态，更新小鸡为SLEEPY状态，然后领取饲料。避免小鸡睡觉后软件异常，引起
+                喂小鸡睡觉的饲料没有领取，而造成缺口
+             */
+            syncAnimalStatus(ownerFarmId)
+            if (AnimalFeedStatus.SLEEPY.name == ownerAnimal.animalFeedStatus) {
+                Log.record(TAG, "小鸡正在睡觉，领取饲料")
+                receiveFarmAwards()
+            }
+
             tc.stop()
         } catch (e: CancellationException) {
             // 协程取消是正常现象，不记录为错误
@@ -769,7 +787,7 @@ class AntFarm : ModelTask() {
                     val manureCount = joRecallAnimal.getInt("manureCount")
                     Log.farm("召回小鸡📣[收获:肥料" + manureCount + "g]")
                 } else {
-                    Log.runtime(TAG, "DEBUG:$ownerAnimal")
+                    Log.record(TAG, "DEBUG:$ownerAnimal")
 
                     syncAnimalStatus(ownerFarmId)
                     var guest = false
@@ -931,7 +949,7 @@ class AntFarm : ModelTask() {
         try {
             val sleepTimeStr = sleepTime!!.value
             if ("-1" == sleepTimeStr) {
-                Log.runtime(TAG, "当前已关闭小鸡睡觉")
+                Log.record(TAG, "当前已关闭小鸡睡觉")
                 return
             }
             val now = TimeUtil.getNow()
@@ -1066,7 +1084,7 @@ class AntFarm : ModelTask() {
     /**
      * 自动喂鸡
      */
-    private suspend fun handleAutoFeedAnimal() {
+    private suspend fun handleAutoFeedAnimal(isChildTask: Boolean = false) {
         if (AnimalInteractStatus.HOME.name != ownerAnimal.animalInteractStatus) {
             return  // 小鸡不在家，不执行喂养逻辑
         }
@@ -1146,9 +1164,24 @@ class AntFarm : ModelTask() {
             }
         }
 
+        // 在蹲点喂食逻辑中判断是否需要执行游戏改分及抽抽乐
+        if (isChildTask) {
+            if (recordFarmGame!!.value) {
+                handleFarmGameLogic()
+            }
+            if (enableChouchoule!!.value) {
+                handleChouChouLeLogic()
+            }
+        }
+
         // 5. 计算并安排下一次自动喂食任务（仅当小鸡不在睡觉时）
         if (AnimalFeedStatus.SLEEPY.name != ownerAnimal.animalFeedStatus) {
             try {
+                /* 创建蹲点任务时间点前先同步countdown，因为可能因为好友小鸡在两次执行间隔间偷吃而引起蹲点时间变动。
+                    比如投喂后程序第一次计算了剩余时间是4小时40分钟，那中间有小鸡偷吃，时间就少于4：40分钟了。再用原来
+                    的时间显然有误,除非其他逻辑同步了小鸡状态才会修正，这里直接同步+修正
+                 */
+                syncAnimalStatus(ownerFarmId)
                 // 直接使用服务器计算的权威倒计时（单位：秒）
                 val remainingSec = countdown?.toDouble()?.coerceAtLeast(0.0)
                 // 如果倒计时为0，跳过任务创建
@@ -1175,11 +1208,15 @@ class AntFarm : ModelTask() {
                                         // 同步最新状态
                                         syncAnimalStatus(ownerFarmId)
                                         // 遣返
-                                        sendBackAnimal()
+                                        if (sendBackAnimal!!.value) {
+                                            sendBackAnimal()
+                                        }
                                         // 雇佣小鸡
-                                        hireAnimal()
+                                        if (hireAnimal!!.value) {
+                                            hireAnimal()
+                                        }
                                         // 喂鸡
-                                        handleAutoFeedAnimal()
+                                        handleAutoFeedAnimal(true)
                                         Log.record(TAG, "🔄 下一次蹲点任务已创建")
                                     } catch (e: Exception) {
                                         Log.error(TAG, "蹲点投喂任务执行失败: ${e.message}")
@@ -1189,11 +1226,7 @@ class AntFarm : ModelTask() {
                                 execTime = nextFeedTime
                             )
                         )
-                        Log.record(
-                            TAG,
-                            "添加蹲点投喂🥣[" + UserMap.getCurrentMaskName() + "]在[" +
-                                    TimeUtil.getCommonDate(nextFeedTime) + "]执行"
-                        )
+                        Log.farm(UserMap.getCurrentMaskName() + "小鸡的蹲点投喂时间[" + TimeUtil.getCommonDate(nextFeedTime)+"]")
                     } else {
                         Log.record(TAG, "蹲点投喂🥣[倒计时为0，开始投喂]")
                         if (feedAnimal(ownerFarmId)) {
@@ -1323,7 +1356,7 @@ class AntFarm : ModelTask() {
         try {
             val s = AntFarmRpcCall.enterFarm(userId, friendUserId)
             var jo = JSONObject(s)
-            Log.runtime(TAG, "DEBUG$jo")
+            Log.record(TAG, "DEBUG$jo")
             jo = jo.getJSONObject("farmVO").getJSONObject("subFarmVO")
             val jaAnimals = jo.getJSONArray("animals")
             for (i in 0..<jaAnimals.length()) {
@@ -1365,7 +1398,7 @@ class AntFarm : ModelTask() {
                         )
                     } else {
                         Log.record(memo)
-                        Log.runtime(s)
+                        Log.record(s)
                     }
                 }
                 rewardList = null
@@ -1392,7 +1425,7 @@ class AntFarm : ModelTask() {
                 // add2FoodStock((int)foodHaveStolen);
             } else {
                 Log.record(memo)
-                Log.runtime(s)
+                Log.record(s)
             }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "recallAnimal err:",t)
@@ -1439,7 +1472,7 @@ class AntFarm : ModelTask() {
                         Log.farm(s)
                     } else {
                         Log.record(memo)
-                        Log.runtime(s)
+                        Log.record(s)
                     }
                 }
             }
@@ -1487,13 +1520,13 @@ class AntFarm : ModelTask() {
                         } else {
                             memo = memo.replace("道具", toolType.nickName().toString())
                             Log.record(memo)
-                            Log.runtime(s)
+                            Log.record(s)
                         }
                     }
                 }
             } else {
                 Log.record(memo)
-                Log.runtime(s)
+                Log.record(s)
             }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "receiveToolTaskReward err:",t)
@@ -1511,7 +1544,7 @@ class AntFarm : ModelTask() {
                 Log.farm("收取鸡蛋🥚[" + harvest + "颗]#剩余" + harvestBenevolenceScore + "颗")
             } else {
                 Log.record(memo)
-                Log.runtime(s)
+                Log.record(s)
             }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "harvestProduce err:",t)
@@ -1551,7 +1584,7 @@ class AntFarm : ModelTask() {
                 }
             } else {
                 Log.record(memo)
-                Log.runtime(s)
+                Log.record(s)
             }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "donation err:",t)
@@ -1570,7 +1603,7 @@ class AntFarm : ModelTask() {
                 return true
             } else {
                 Log.record(memo)
-                Log.runtime(s)
+                Log.record(s)
             }
         } catch (t: Throwable) {
             Log.printStackTrace(t)
@@ -1673,7 +1706,7 @@ class AntFarm : ModelTask() {
      */
     private fun updateTomorrowAnswerCache(operationConfigList: JSONArray, date: String?) {
         try {
-            Log.runtime(TAG, "updateTomorrowAnswerCache 开始更新缓存")
+            Log.record(TAG, "updateTomorrowAnswerCache 开始更新缓存")
             val farmAnswerCache = DataStore.getOrCreate<MutableMap<String, String>>(FARM_ANSWER_CACHE_KEY)
             for (j in 0..<operationConfigList.length()) {
                 val operationConfig = operationConfigList.getJSONObject(j)
@@ -1692,7 +1725,7 @@ class AntFarm : ModelTask() {
                 }
             }
             DataStore.put(FARM_ANSWER_CACHE_KEY, farmAnswerCache)
-            Log.runtime(TAG, "updateTomorrowAnswerCache 缓存更新完毕")
+            Log.record(TAG, "updateTomorrowAnswerCache 缓存更新完毕")
         } catch (e: Exception) {
             Log.printStackTrace(TAG, "updateTomorrowAnswerCache 错误:", e)
         }
@@ -1704,7 +1737,7 @@ class AntFarm : ModelTask() {
      */
     private fun cleanOldAnswers(farmAnswerCache: MutableMap<String, String>?, today: String?) {
         try {
-            Log.runtime(TAG, "cleanOldAnswers 开始清理缓存")
+            Log.record(TAG, "cleanOldAnswers 开始清理缓存")
             if (farmAnswerCache == null || farmAnswerCache.isEmpty()) return
             // 将今天日期转为数字格式：20250405
             val todayInt = convertDateToInt(today) // 如 "2025-04-05" → 20250405
@@ -1721,13 +1754,13 @@ class AntFarm : ModelTask() {
                         if (dateInt == -1) continue
                         if (todayInt - dateInt <= daysToKeep) {
                             cleanedMap[entry.key] = entry.value //保存7天内的答案
-                            Log.runtime(TAG, "保留 日期：" + todayInt + "缓存日期：" + dateInt + " 题目：" + parts[0])
+                            Log.record(TAG, "保留 日期：" + todayInt + "缓存日期：" + dateInt + " 题目：" + parts[0])
                         }
                     }
                 }
             }
             DataStore.put(FARM_ANSWER_CACHE_KEY, cleanedMap)
-            Log.runtime(TAG, "cleanOldAnswers 清理缓存完毕")
+            Log.record(TAG, "cleanOldAnswers 清理缓存完毕")
         } catch (e: Exception) {
             Log.printStackTrace(TAG, "cleanOldAnswers error:", e)
         }
@@ -1741,7 +1774,7 @@ class AntFarm : ModelTask() {
      * @return 日期数字格式，如 "2025-04-05" → 20250405
      */
     private fun convertDateToInt(dateStr: String?): Int {
-        Log.runtime(TAG, "convertDateToInt 开始转换日期：$dateStr")
+        Log.record(TAG, "convertDateToInt 开始转换日期：$dateStr")
         if (dateStr == null || dateStr.length != 10 || dateStr[4] != '-' || dateStr[7] != '-') {
             Log.error("日期格式错误：$dateStr")
             return -1 // 格式错误
@@ -1791,10 +1824,10 @@ class AntFarm : ModelTask() {
                                 continue
                             }
                         } else {
-                            Log.runtime(TAG, "庄园游戏$jo")
+                            Log.record(TAG, "庄园游戏$jo")
                         }
                     } else {
-                        Log.runtime(TAG, "进入庄园游戏失败$jo")
+                        Log.record(TAG, "进入庄园游戏失败$jo")
                     }
                     break
                 } finally {
@@ -1807,6 +1840,87 @@ class AntFarm : ModelTask() {
             throw e
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "recordFarmGame err:",t)
+        }
+    }
+
+    // 庄园游戏
+    private suspend fun playAllFarmGames() {
+        recordFarmGame(GameType.flyGame)
+        recordFarmGame(GameType.hitGame)
+        recordFarmGame(GameType.starGame)
+        recordFarmGame(GameType.jumpGame)
+        Status.setFlagToday("farm::farmGameFinished")
+        Log.farm("今日庄园游戏改分已完成")
+    }
+    private suspend fun handleFarmGameLogic() {
+        // 1. 检查游戏改分是否已完成
+        if (Status.hasFlagToday("farm::farmGameFinished")) {
+            Log.record("今日庄园游戏改分已完成")
+            return
+        }
+        val isAccelEnabled = useAccelerateTool!!.value
+        val isAccelLimitReached = Status.hasFlagToday("farm::accelerateLimit") || !Status.canUseAccelerateTool()
+        val isInsideTimeRange = farmGameTime!!.value.any { TimeUtil.checkNowInTimeRange(it) }
+        when {
+            // 开启了使用加速卡，且加速卡已达上限
+            isAccelEnabled && isAccelLimitReached -> {
+                syncAnimalStatus(ownerFarmId)
+                // 饲料缺口在180g以上时先领饲料
+                if (foodStock < foodStockLimit - 180) {
+                    receiveFarmAwards()
+                }
+                // 满足 180g 预留空间则执行
+                if (foodStock >= foodStockLimit - 180) {
+                    playAllFarmGames()
+                } else {
+                    Log.farm("加速卡已达上限，但饲料缺口仍超过180g，暂不改分以防浪费")
+                }
+            }
+
+            // 未启用加速卡，且处于用户设定的时间段内（原逻辑）
+            !isAccelEnabled && isInsideTimeRange -> {
+                playAllFarmGames()
+            }
+
+            // 加速卡还没用完，等待加速卡用完
+            isAccelEnabled && !isAccelLimitReached -> {
+                Log.farm("加速卡尚未达到今日上限，等待加速完成后再改分")
+            }
+        }
+    }
+
+    // 抽抽乐执行
+    private suspend fun playChouChouLe() {
+        val ccl = ChouChouLe()
+        ccl.chouchoule()
+        Status.setFlagToday("farm::chouChouLeFinished")
+        Log.farm("今日抽抽乐已完成")
+    }
+    private suspend fun handleChouChouLeLogic() {
+        // 1. 检查抽抽乐是否已完成
+        if (Status.hasFlagToday("farm::chouChouLeFinished")) {
+            Log.record("今日抽抽乐已完成")
+            return
+        }
+        val isGameFinished = Status.hasFlagToday("farm::farmGameFinished")
+        val isGameEnabled = recordFarmGame!!.value
+        val isTimeReached = TaskTimeChecker.isTimeReached(enableChouchouleTime?.value, "0900")
+        when {
+            // 游戏改分已完成直接执行抽抽乐
+            isGameFinished -> {
+                playChouChouLe()
+            }
+            // 未开启游戏改分，且到达了设定的时间（原逻辑）
+            !isGameEnabled && isTimeReached -> {
+                playChouChouLe()
+            }
+            !isGameEnabled && !isTimeReached -> {
+                Log.record(TAG, "未开启游戏改分且抽抽乐未到设置的执行时间(${enableChouchouleTime?.value ?: "0900"})，跳过")
+            }
+            // 游戏改分任务尚未完成
+            isGameEnabled && !isGameFinished -> {
+                Log.farm("游戏改分还没有完成，暂不执行抽抽乐")
+            }
         }
     }
 
@@ -1834,9 +1948,9 @@ class AntFarm : ModelTask() {
                 // 检查任务标题和业务键是否在黑名单中
                 val titleInBlacklist = TaskBlacklist.isTaskInBlacklist(title)
                 val bizKeyInBlacklist = TaskBlacklist.isTaskInBlacklist(bizKey)
-                    Log.debug(TAG, "庄园任务检查 - 标题: $title, 业务键: $bizKey, 标题在黑名单: $titleInBlacklist, 业务键在黑名单: $bizKeyInBlacklist")
+
                 if (titleInBlacklist || bizKeyInBlacklist) {
-                    Log.debug(TAG, "跳过黑名单任务: $title ($bizKey)")
+                    Log.record(TAG, "跳过黑名单任务: $title ($bizKey)")
                     continue
                 }
 
@@ -1862,7 +1976,7 @@ class AntFarm : ModelTask() {
                         }
                     }
                 }else{
-                    Log.debug(TAG, "跳过非TODO任务: $title ($bizKey) 状态: $taskStatus")
+                    Log.record(TAG, "跳过非TODO任务: $title ($bizKey) 状态: $taskStatus")
                 }
                 // 3. 额外处理某些即便不是 TODO 状态也可能需要检查的任务（如答题补漏）
                 if ("ANSWER" == bizKey && !Status.hasFlagToday(CACHED_FLAG)) {
@@ -1930,7 +2044,7 @@ class AntFarm : ModelTask() {
                 val response = AntFarmRpcCall.listFarmTask()
                 // 检查空响应
                 if (response.isNullOrEmpty()) {
-                    Log.runtime(TAG, "receiveFarmAwards: 收到空响应，跳过本次执行")
+                    Log.record(TAG, "receiveFarmAwards: 收到空响应，跳过本次执行")
                     return
                 }
                 val jo = JSONObject(response)
@@ -1951,23 +2065,48 @@ class AntFarm : ModelTask() {
                             // 领取前先同步一次食槽状态，避免边界误差
                             syncAnimalStatus(ownerFarmId)
 
+                            val foodStockAfter = foodStock + awardCount
                             if ("ALLPURPOSE" == task.optString("awardType")) {
-                                // 使用 ">=" 防止刚好到上限时仍然领取导致 331
-                                if (awardCount + foodStock >= foodStockLimit) {
+                                /* 领取饲料前，当现有饲料>=上限时（实时只可能等于，不需要用大于等于的判断），或者在晚上20点前领取饲料后使饲料超过上限，则不领取饲料，
+                                    直接break方法。但是如果时间在20点后，这时饲料没满，比如差80g满，这时候领取90g的任务奖励虽然会超过饲料上限，但还是依然领取
+                                    饲料，这样能保证饲料第二天是满的开局。如果需要赠送饲料或厨房等会使饲料不是以90/180g减少的操作，应该不会有人在20点后还没有
+                                    完成吧？同时也避免了原逻辑的饲料差90g以内后总是领不满的问题。
+                                 */
+                                if ((foodStock >= foodStockLimit) || ((awardCount + foodStock > foodStockLimit) && !TimeUtil.isNowAfterOrCompareTimeStr("2000")) ) {
                                     unreceiveTaskAward++
-                                    Log.record(
-                                        TAG,
-                                        taskTitle + "领取" + awardCount + "g饲料后将达到/超过[" + foodStockLimit + "g]上限!终止领取"
-                                    )
-                                    isFeedFull = true
-                                    break
+                                    if (foodStock == foodStockLimit){
+                                        Log.record(TAG, "饲料[已满],暂不领取")
+                                        break
+                                    } else {
+                                        Log.record(
+                                            TAG,
+                                            "领取任务：${ taskTitle } 的 ${awardCount}g饲料后将超过[${foodStockLimit}g]上限!终止领取。现有饲料${foodStock}g"
+                                        )
+                                        isFeedFull = true
+                                        break
+                                    }
                                 }
+                            }
+                            // 针对连续使用加速卡时的领取饲料逻辑，留180g以内（含180g）的空间。如果游戏改分未完成，比如饲料正好是1620g时（上限1800g），不领取饲料。(同时确认开启游戏改分)
+                            if ((!Status.hasFlagToday("farm::farmGameFinished")) && (foodStock >= foodStockLimit - 180) && recordFarmGame!!.value){
+                                Log.farm("当日游戏改分未完成，预留180g饲料空间，现有饲料${foodStock}g")
+                                break
                             }
                             val receiveTaskAwardjo =
                                 JSONObject(AntFarmRpcCall.receiveFarmTaskAward(taskId))
                             if (ResChecker.checkRes(TAG + "领取庄园任务奖励失败:", receiveTaskAwardjo)) {
                                 add2FoodStock(awardCount)
-                                Log.farm("庄园奖励[" + taskTitle + "]#" + awardCount + "g")
+                                Log.farm("收取庄园任务奖励[" + taskTitle + "]#" + awardCount + "g")
+                                if(foodStockAfter > foodStockLimit){
+                                    // 20点后满足条件的领取的log
+                                    Log.farm("时间超过20点，即使领取后将[超过]饲料上限仍将领取饲料奖励。饲料已到上限${foodStockLimit}g")
+                                    break
+                                }
+                                if(foodStock == foodStockLimit){
+                                    // 领满就直接跳出循环，避免再提交一次领取请求
+                                    Log.farm("领取饲料后饲料[已满]" + foodStockLimit + "g，停止后续领取")
+                                    break
+                                }
                                 doubleCheck = true
                                 if (unreceiveTaskAward > 0) unreceiveTaskAward--
                             }
@@ -2067,7 +2206,7 @@ class AntFarm : ModelTask() {
                     if ("311" == resultCode) {
                         Log.record(TAG, "投喂小鸡🥣[$memo]")
                     } else {
-                        Log.runtime(TAG, "投喂小鸡失败: $jo")
+                        Log.record(TAG, "投喂小鸡失败: $jo")
                     }
                 }
             }
@@ -2122,46 +2261,139 @@ class AntFarm : ModelTask() {
         }
         // 4) 同步最新状态，确保消耗速度、已吃量、食槽上限为最新
         syncAnimalStatus(ownerFarmId)
-        var totalConsumeSpeed = 0.0
+
+        // 当前小鸡剩余多长时间吃完饲料
+        val currentCountdown = countdown?.toDouble() ?: 0.0
+        if (currentCountdown <= 0) return false
+
         var totalFoodHaveEatten = 0.0
-        val nowTime = System.currentTimeMillis() / 1000
-        // 5) 计算“总已吃量（含时间增量）”与“总消耗速度”
+        var totalConsumeSpeed = 0.0
+        /* 小鸡自己已经吃的食物参数是foodHaveStolen，而不是foodHaveEatten,这是非常关键的问题！
+            实际情况是使用加速卡后所吃的饲料才算在foodHaveEatten里，foodHaveEatten即使不使用加速卡也会有个随机？的1以内的值，通常0.1左右，也就是非0
+            startEatTime通常是投喂小鸡饲料的时间，但
+            小鸡起床后startEatTime（含日期参数的时间）会重新变更为起床的时间，比如6：00起床，而喂食时间实际是昨晚的20：00,startEatTime=20：00,然后小鸡睡觉
+            6：00起床，再获取startEatTime则为6：00
+            因此剩余饲料量应该使用countdown来进行计算，这是准确的。
+         */
         for (animal in animals!!) {
+            totalFoodHaveEatten += animal.foodHaveStolen!!
             totalFoodHaveEatten += animal.foodHaveEatten!!
-            totalFoodHaveEatten += animal.consumeSpeed!! * (nowTime - animal.startEatTime!!.toDouble() / 1000)
             totalConsumeSpeed += animal.consumeSpeed!!
         }
+        // 自己的小鸡每小时消耗的饲料g数
+        val  foodConsumePerHour = ownerAnimal.consumeSpeed!! * 60 * 60
         Log.record(
             TAG,
             "加速卡内部计算⏩[totalConsumeSpeed=$totalConsumeSpeed, totalFoodHaveEatten=$totalFoodHaveEatten, limit=$foodInTroughLimitCurrent]"
         )
-        // 6) 判定条件：至少还能吃满 1 小时（3600 秒）的量才使用一次加速卡
-        //    单位换算：consumeSpeed 单位为 g/s，因此 1 小时的消耗 = totalConsumeSpeed * 3600
+        if (totalConsumeSpeed <= 0) return false
+        /* 修改为剩余时间大于自定义remainingTime分钟则使用加速卡，也就是说，当你界面上看到的多久之后吃完。目前的逻辑是小于60分钟则不使用加速卡
+            这可以避免损失部分时间，但是不利于一次性完成所有任务，因此可以自定义剩余时间，比如设置剩余时间为40（分钟）时，在饲料吃完剩余时间在40
+            分钟以上时，比如剩余41分钟，则直接使用加速卡，并进行后续逻辑（把加速卡用完、再游戏改分、再抽抽乐）；但是如果剩余时间是39分钟，则不使用
+            加速卡，需等待饲料吃完再次投喂后进入加速卡判断模块继续使用加速卡。
+            剩余时间的设置在软件设置里；值为1-59,设置其他值则默认是原逻辑，即60分钟内的不加速。
+         */
         var isUseAccelerateTool = false
-        while (foodInTroughLimitCurrent - totalFoodHaveEatten >= totalConsumeSpeed * 3600) {
+        var remainingTimeValue = remainingTime.value
+        if (remainingTimeValue !in 1..<60){
+            remainingTimeValue = 60
+            Log.farm("连续使用加速卡加速的剩余时间设置有误，正确值1-59,现不加速剩余时间为1个小时内的饲料")
+        }
+        // 剩余饲料量应该根据当前吃饲料的总速度 * 剩余时间原计算逻辑是错误的，总速度就是自己的鸡+偷吃的鸡
+        var remainingFood = currentCountdown * totalConsumeSpeed
+        /* 加速卡逻辑应该是消耗自己小鸡1个小时的食物消耗量，这个量只取决于自己小鸡的食物消耗速度，大约38g左右；
+            计算：foodConsumeSpeed（g/s） * 3600 (g)
+            因此对于不足一个小时/指定大于剩余时间的加速应该理解为剩余饲料大于这个指定时间的自己小鸡的食物消耗量，
+            这种情况下即使有多只偷吃小鸡时也可以按照设置的剩余时间（remainingTime）正确的把加速卡连续使用光。
+            也就是说，即使有多只鸡在偷吃/工作，界面上显示还有remainingTime分钟吃完，那使用加速卡也可以加速掉
+            剩余食物，然后再次投喂
+         */
+        /* 1. 定义一个用于记录退出原因的变量，是为了在exitReason == "CONDITION_NOT_MET"，在小鸡饲料剩余时间不足设置
+            的remainingTime时进行日志打印，如设置的是40分钟，但是饲料剩余只有30分钟，那打印一下为什么没有把加速卡用完。
+         */
+
+        var exitReason = "CONDITION_NOT_MET"
+        while (remainingFood >= remainingTimeValue / 60.0 * foodConsumePerHour ) {
             // 检查本地计数器上限，防止无限使用
             if (!Status.canUseAccelerateTool()) {
                 Log.record(TAG, "加速卡内部⏩已达到本地使用上限(8次)，停止使用")
+                Status.setFlagToday("farm::accelerateLimit")
+                exitReason = "REACHED_LIMIT"
                 break
             }
             // 可选条件：若勾选“仅心情满值时加速”，且当前心情不为 100，则跳出
             if ((useAccelerateToolWhenMaxEmotion!!.value && finalScore != 100.0)) {
+                exitReason = "EMOTION_NOT_MAX"
                 break
             }
             if (useFarmTool(ownerFarmId, ToolType.ACCELERATETOOL)) {
-                // 使用成功后，等效地“吃掉”未来 1 小时的饲料
-                totalFoodHaveEatten += totalConsumeSpeed * 3600
+                // 用了一张加速卡，那剩余饲料减少自己小鸡1个小时的饲料消耗量，如前述38g左右
+                remainingFood -= foodConsumePerHour
                 isUseAccelerateTool = true
                 Status.useAccelerateTool()
-                delay(1000)
+                val timeLeft = remainingFood / totalConsumeSpeed
+                if (timeLeft >= 0.0){
+                    Log.farm("使用了1张加速卡⏩ 预估剩余时间: ${(timeLeft/60).toInt()} 分钟")
+                    // 打印用了几张加速卡
+                    Log.farm("今日已使用${Status.INSTANCE.useAccelerateToolCount}张加速卡")
+                    delay(1000)
+                } else{
+                    /* timeLeft也就是饲料剩余时间，小于0则说明饲料吃完了，直接进行投喂，这样可以在一次任务里完成加速
+                        卡的使用。如果加速后吃完了，尝试补喂并刷新倒计时。等待8秒是为了防止计算结果的细微差异引起投喂失败
+                     */
+                    Log.farm("使用加速卡后小鸡饲料吃完，等待8秒后尝试喂鸡")
+                    delay(8000)
+                    // 等8秒刷新一下小鸡状态，确认是真的处于饥饿状态
+                    syncAnimalStatus(ownerFarmId)
+                    if (AnimalFeedStatus.HUNGRY.name == ownerAnimal.animalFeedStatus) {
+                        if (feedAnimal(ownerFarmId)) {
+                            // 这里似乎不用在刷新了
+                            syncAnimalStatus(ownerFarmId)
+                            // 投喂成功后剩余食物变成了180g
+                            remainingFood = 180.0
+                            Log.farm("加速卡后投喂小鸡成功！")
+                            /* 使用加速卡后尝试领取饲料，因为连续使用加速卡会导致饲料缺口，连续使用8张加速卡，最多可
+                                能投喂两次，饲料减少360g,这显然会导致游戏改分的判断条件失败，这样就不能在一次软件运行
+                                过程中完成所有任务，所以需要根据条件领取饲料。领取逻辑是，游戏改分飞行赛2次可以通常
+                                得到180g饲料，我测试没有低于180g的时候，因此可以留180g不领，用飞行赛填补。打小鸡
+                                没有饲料奖励
+                             */
+                            // 判断游戏改分还没完成。按照我的设计，其实这里不用判断，因为任务顺序就是先加速->游戏改分
+                            if (!Status.hasFlagToday("farm::farmGameFinished")){
+                                // 饲料量比上限少超过了180g则领取饲料，在180g内则不领，留给飞行赛填补
+                                if (foodStock < foodStockLimit - 180) {
+                                    Log.farm("加速后已喂食，领取饲料奖励")
+                                    receiveFarmAwards()
+                                } else {
+                                    Log.farm("今天游戏改分还没有完成，预留180g的饲料剩余空间，目前饲料${foodStock}g，还差${foodStockLimit - foodStock}g满饲料")
+                                }
+                            } else {
+                                Log.farm("加速后已喂食，领取饲料奖励")
+                                receiveFarmAwards()
+                            }
+                        } else {
+                            remainingFood = (countdown?.toDouble() ?: 0.0) * totalConsumeSpeed
+                            Log.farm("使用加速卡使饲料吃完，投喂小鸡失败！")
+                        }
+                    } else {
+                        // 如果再次同步发现小鸡不是饥饿状态，重新开始计算remainingFood
+                        remainingFood = (countdown?.toDouble() ?: 0.0) * totalConsumeSpeed
+                    }
+                }
             } else {
                 Log.record(TAG, "加速卡内部⏩useFarmTool 返回失败，终止循环")
+                exitReason = "TOOL_USE_FAILED"
                 break
             }
             // 若未开启“连续使用”，只使用 1 次后退出
             if (!useAccelerateToolContinue!!.value) {
+                exitReason = "SINGLE_USE_MODE"
                 break
             }
+        }
+        // 这里打印没有连续使用8张加速卡的原因
+        if (exitReason == "CONDITION_NOT_MET") {
+            Log.farm("剩余可加速的时间少于设置的${remainingTimeValue}分钟，将在下次喂食后再次使用加速卡")
         }
         Log.record(TAG, "加速卡内部⏩最终 isUseAccelerateTool=$isUseAccelerateTool")
         return isUseAccelerateTool
@@ -2195,14 +2427,14 @@ class AntFarm : ModelTask() {
                                 }
                                 Log.record(memo)
                             }
-                            Log.runtime(s)
+                            Log.record(s)
                         }
                         break
                     }
                 }
             } else {
                 Log.record(memo)
-                Log.runtime(s)
+                Log.record(s)
             }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "useFarmTool err:",t)
@@ -2312,7 +2544,7 @@ class AntFarm : ModelTask() {
                 s = AntFarmRpcCall.rankingList(pageStartSum)
                 // 检查空响应
                 if (s.isNullOrEmpty()) {
-                    Log.runtime(TAG, "notifyFriend.rankingList: 收到空响应，终止通知")
+                    Log.record(TAG, "notifyFriend.rankingList: 收到空响应，终止通知")
                     break // 跳出do-while循环
                 }
                 jo = JSONObject(s)
@@ -2360,13 +2592,13 @@ class AntFarm : ModelTask() {
                                 }
                             } else {
                                 Log.record(memo)
-                                Log.runtime(s)
+                                Log.record(s)
                             }
                         }
                     }
                 } else {
                     Log.record(memo)
-                    Log.runtime(s)
+                    Log.record(s)
                 }
             } while (hasNext)
             Log.record(TAG, "饲料剩余[" + foodStock + "g]")
@@ -2449,7 +2681,7 @@ class AntFarm : ModelTask() {
                             val collectManurePotNum = joManurePot.getInt("collectManurePotNum")
                             Log.farm("打扫鸡屎🧹[" + collectManurePotNum + "g]" + i + 1 + "次")
                         } else {
-                            Log.runtime(TAG, "打扫鸡屎失败: 第" + i + 1 + "次" + joManurePot)
+                            Log.record(TAG, "打扫鸡屎失败: 第" + i + 1 + "次" + joManurePot)
                         }
                     }
                 }
@@ -2576,7 +2808,7 @@ class AntFarm : ModelTask() {
         try {
             val userId = UserMap.currentUid
             var jo = JSONObject(AntFarmRpcCall.enterKitchen(userId))
-            Log.runtime(TAG, "cook userid :$userId")
+            Log.record(TAG, "cook userid :$userId")
             if (ResChecker.checkRes(TAG, jo)) {
                 val cookTimesAllowed = jo.getInt("cookTimesAllowed")
                 if (cookTimesAllowed > 0) {
@@ -2586,7 +2818,7 @@ class AntFarm : ModelTask() {
                             val cuisineVO = jo.getJSONObject("cuisineVO")
                             Log.farm("小鸡厨房👨🏻‍🍳[" + cuisineVO.getString("name") + "]制作成功")
                         } else {
-                            Log.runtime(TAG, "小鸡厨房制作$jo")
+                            Log.record(TAG, "小鸡厨房制作$jo")
                         }
                         delay(RandomUtil.delay().toLong())
                     }
@@ -2761,8 +2993,8 @@ class AntFarm : ModelTask() {
                             val prizeNum = jo.optInt("prizeNum", 0)
                             Log.farm("[$diaryDateStr]贴贴小鸡💞[$prizeType*$prizeNum]")
                         } else {
-                            Log.runtime(TAG, "贴贴小鸡失败:")
-                            Log.runtime(jo.getString("memo"), jo.toString())
+                            Log.record(TAG, "贴贴小鸡失败:")
+                            Log.record(jo.getString("memo"), jo.toString())
                         }
                         if (!chickenDiary.has("statisticsList")) return
                         val statisticsList = chickenDiary.getJSONArray("statisticsList")
@@ -2781,16 +3013,16 @@ class AntFarm : ModelTask() {
                                     val prizeNum = jo.optInt("prizeNum", 0)
                                     Log.farm("[$diaryDateStr]贴贴小鸡💞[$prizeType*$prizeNum]")
                                 } else {
-                                    Log.runtime(TAG, "贴贴小鸡失败:")
-                                    Log.runtime(jo.getString("memo"), jo.toString())
+                                    Log.record(TAG, "贴贴小鸡失败:")
+                                    Log.record(jo.getString("memo"), jo.toString())
                                 }
                             }
                         }
                     }
                 }
             } else {
-                Log.runtime(TAG, "贴贴小鸡-获取小鸡日记详情 err:")
-                Log.runtime(jo.getString("resultDesc"), jo.toString())
+                Log.record(TAG, "贴贴小鸡-获取小鸡日记详情 err:")
+                Log.record(jo.getString("resultDesc"), jo.toString())
             }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "queryChickenDiary err:",t)
@@ -2818,8 +3050,8 @@ class AntFarm : ModelTask() {
                     }
                 }
             } else {
-                Log.runtime(TAG, "日记点赞-获取小鸡日记详情 err:")
-                Log.runtime(jo.getString("resultDesc"), jo.toString())
+                Log.record(TAG, "日记点赞-获取小鸡日记详情 err:")
+                Log.record(jo.getString("resultDesc"), jo.toString())
             }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "queryChickenDiary err:",t)
@@ -2856,7 +3088,7 @@ class AntFarm : ModelTask() {
                     }
                 }
             } else {
-                Log.runtime(jo.getString("resultDesc"), jo.toString())
+                Log.record(jo.getString("resultDesc"), jo.toString())
             }
         } catch (e: CancellationException) {
             // 协程取消异常必须重新抛出，不能吞掉
@@ -2920,7 +3152,7 @@ class AntFarm : ModelTask() {
         try {
             val response = AntFarmRpcCall.visitAnimal()
             if (response.isNullOrEmpty()) {
-                Log.runtime(TAG, "visitAnimal: 收到空响应")
+                Log.record(TAG, "visitAnimal: 收到空响应")
                 return
             }
             var jo = JSONObject(response)
@@ -2933,7 +3165,7 @@ class AntFarm : ModelTask() {
 
                 val response2 = AntFarmRpcCall.feedFriendAnimalVisit(farmId)
                 if (response2.isNullOrEmpty()) {
-                    Log.runtime(TAG, "feedFriendAnimalVisit: 收到空响应")
+                    Log.record(TAG, "feedFriendAnimalVisit: 收到空响应")
                     return
                 }
                 jo = JSONObject(response2)
@@ -2950,14 +3182,14 @@ class AntFarm : ModelTask() {
                             val prizeName = jo.getString("prizeName")
                             Log.farm("小鸡到访💞[$prizeName]")
                         } else {
-                            Log.runtime(jo.getString("memo"), jo.toString())
+                            Log.record(jo.getString("memo"), jo.toString())
                         }
                     }
                 } else {
-                    Log.runtime(jo.getString("memo"), jo.toString())
+                    Log.record(jo.getString("memo"), jo.toString())
                 }
             } else {
-                Log.runtime(jo.getString("resultDesc"), jo.toString())
+                Log.record(jo.getString("resultDesc"), jo.toString())
             }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "visitAnimal err:",t)
@@ -3088,7 +3320,7 @@ class AntFarm : ModelTask() {
                     }
                 } else {
                     Log.record(memo)
-                    Log.runtime(s)
+                    Log.record(s)
                     break
                 }
             } while (hasNext && animalCount < 3)
@@ -3176,7 +3408,7 @@ class AntFarm : ModelTask() {
                                 return false
                             }
                             Log.record(memo)
-                            Log.runtime(s)
+                            Log.record(s)
                         }
                         return false
                     }
@@ -3219,7 +3451,7 @@ class AntFarm : ModelTask() {
                                 ) + "]"
                             )
                         } else {
-                            Log.runtime(TAG, "drawGameCenterAward falsed result: $jo")
+                            Log.record(TAG, "drawGameCenterAward falsed result: $jo")
                         }
                     } catch (e: CancellationException) {
                         // 协程取消异常必须重新抛出，不能吞掉
@@ -3229,7 +3461,7 @@ class AntFarm : ModelTask() {
                     }
                 }
             } else {
-                Log.runtime(TAG, "queryGameList falsed result: $jo")
+                Log.record(TAG, "queryGameList falsed result: $jo")
             }
         } catch (e: CancellationException) {
             // 协程取消异常必须重新抛出，不能吞掉
@@ -3314,7 +3546,7 @@ class AntFarm : ModelTask() {
                         Log.farm("庄园小鸡💞[换装:$wholeSetName]")
                         Status.setOrnamentToday()
                     } else {
-                        Log.runtime(TAG, "保存时装失败，错误码： $saveResultJson")
+                        Log.record(TAG, "保存时装失败，错误码： $saveResultJson")
                     }
                 }
             }
@@ -3569,6 +3801,9 @@ class AntFarm : ModelTask() {
 
         @JsonProperty("foodHaveEatten")
         var foodHaveEatten: Double? = null
+
+        @JsonProperty("foodHaveStolen")
+        var foodHaveStolen: Double? = null
 
         @JsonProperty("animalStatusVO")
         fun unmarshalAnimalStatusVO(map: MutableMap<String?, Any?>?) {
@@ -4030,7 +4265,7 @@ class AntFarm : ModelTask() {
                         continue
                     }
                     if (Status.hasFlagToday("farm::feedFriendLimit")) {
-                        Log.runtime("今日喂鸡次数已达上限🥣")
+                        Log.record("今日喂鸡次数已达上限🥣")
                         return
                     }
                     val jo = JSONObject(AntFarmRpcCall.feedFriendAnimal(farmId, groupId))
