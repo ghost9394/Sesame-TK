@@ -237,7 +237,6 @@ class AntFarm : ModelTask() {
     private var paradiseCoinExchangeBenefitList: SelectModelField? = null
 
     private var visitAnimal: BooleanModelField? = null
-    private var accelerateToolCount = -1
 
     override fun getFields(): ModelFields {
         val modelFields = ModelFields()
@@ -2230,9 +2229,6 @@ class AntFarm : ModelTask() {
                     tool.toolCount = jo.getInt("toolCount")
                     tool.toolHoldLimit = jo.optInt("toolHoldLimit", 20)
                     tempList.add(tool)
-                    if (tool.toolType == ToolType.ACCELERATETOOL) {
-                        accelerateToolCount = tool.toolCount
-                    }
                 }
                 farmTools = tempList.toTypedArray()
             }
@@ -2240,6 +2236,8 @@ class AntFarm : ModelTask() {
             Log.printStackTrace(TAG, "listFarmTool err:", t)
         }
     }
+    private val accelerateToolCount: Int
+        get() = farmTools.find { it.toolType == ToolType.ACCELERATETOOL }?.toolCount ?: 0
 
     /**
      * 连续使用加速卡
@@ -2418,6 +2416,7 @@ class AntFarm : ModelTask() {
                             memo = jo.getString("memo")
                             if (ResChecker.checkRes(TAG, jo)) {
                                 Log.farm("使用道具🎭[" + toolType.nickName() + "]#剩余" + (toolCount - 1) + "张")
+                                listFarmTool()
                                 return true
                             } else {
                                 // 针对加速卡：当日达到上限(resultCode=3D16)后，设置当日标记，避免后续重复尝试
