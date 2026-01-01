@@ -237,6 +237,7 @@ class AntFarm : ModelTask() {
     private var paradiseCoinExchangeBenefitList: SelectModelField? = null
 
     private var visitAnimal: BooleanModelField? = null
+    private var accelerateToolCount = -1
 
     override fun getFields(): ModelFields {
         val modelFields = ModelFields()
@@ -1863,18 +1864,13 @@ class AntFarm : ModelTask() {
         val isInsideTimeRange = farmGameTime!!.value.any { TimeUtil.checkNowInTimeRange(it) }
         when {
             // 开启了使用加速卡，且加速卡已达上限
-            isAccelEnabled && isAccelLimitReached -> {
+            isAccelEnabled && (isAccelLimitReached || accelerateToolCount <= 0) -> {
                 syncAnimalStatus(ownerFarmId)
                 // 饲料缺口在180g以上时先领饲料
                 if (foodStock < foodStockLimit - 180) {
                     receiveFarmAwards()
                 }
-                // 满足 180g 预留空间则执行
-                if (foodStock >= foodStockLimit - 180) {
-                    playAllFarmGames()
-                } else {
-                    Log.farm("加速卡已达上限，但饲料缺口仍超过180g，暂不改分以防浪费")
-                }
+                playAllFarmGames()
             }
 
             // 未启用加速卡，且处于用户设定的时间段内（原逻辑）
@@ -1883,8 +1879,9 @@ class AntFarm : ModelTask() {
             }
 
             // 加速卡还没用完，等待加速卡用完
-            isAccelEnabled && !isAccelLimitReached -> {
-                Log.farm("加速卡尚未达到今日上限，等待加速完成后再改分")
+            isAccelEnabled && !isAccelLimitReached && accelerateToolCount > 0 -> {
+                Log.farm("加速卡有${accelerateToolCount}张，已使用${Status.INSTANCE.useAccelerateToolCount}张，" +
+                        "尚未达到今日使用上限，等待加速完成后再改分")
             }
         }
     }
@@ -1941,8 +1938,8 @@ class AntFarm : ModelTask() {
                 val taskStatus = task.getString("taskStatus")
                 val bizKey = task.getString("bizKey")
 
-              //  val taskMode = task.optString("taskMode")
-              //  if(taskMode=="TRIGGER")     continue                 //跳过事件任务
+                //  val taskMode = task.optString("taskMode")
+                //  if(taskMode=="TRIGGER")     continue                 //跳过事件任务
 
                 // 1. 预检查：黑名单与每日上限
                 // 检查任务标题和业务键是否在黑名单中
@@ -2233,6 +2230,9 @@ class AntFarm : ModelTask() {
                     tool.toolCount = jo.getInt("toolCount")
                     tool.toolHoldLimit = jo.optInt("toolHoldLimit", 20)
                     tempList.add(tool)
+                    if (tool.toolType == ToolType.ACCELERATETOOL) {
+                        accelerateToolCount = tool.toolCount
+                    }
                 }
                 farmTools = tempList.toTypedArray()
             }
