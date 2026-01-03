@@ -56,6 +56,14 @@ object Credit2101 {
 
     private const val TAG = "2101"//Credit
 
+    /** 故事ID数组 */
+    private val STORY_IDS = listOf(
+        1001011, 1001022, 1001034, 1001043, 2001011, 2001019, 2001026, 2001035,
+        3001011, 3001020, 3001027, 3001036, 4001010, 4001018, 4001027, 4001035,
+        5001009, 5001016, 5001025, 5001034, 6001010, 6001019, 6001026, 6001033,
+        7001010, 7001015, 7001026, 7001033
+    )
+
     /** 账户信息缓存，用于事件处理和能量判断 */
     private data class AccountInfo(
         val creditProfile: Int,
@@ -1307,7 +1315,7 @@ object Credit2101 {
     }
 
     /**
-     * 处理故事事件（SPACE_TIME_GATE）
+     * 处理故事事件（SPACE_TIME_GATE）- 批量提交版本
      */
     private fun handleSpaceTimeGate(
         batchNo: String,
@@ -1319,46 +1327,80 @@ object Credit2101 {
         try {
             val queryResp = Credit2101RpcCall.queryEventGate(batchNo, eventId, cityCode, latitude, longitude)
 
-
-
             if (!ResChecker.checkRes(TAG, queryResp)) {
                 Log.record(TAG, "信用2101📖[故事事件查询失败] resp=$queryResp")
                 return
             }
             val qJo = JSONObject(queryResp)
+            
             //5001009  5001025(携妻归汉)   是张骞
             //1001043 是沈万三
             //4001018 是郑和
-            //
-            // storyId 可能在返回中带出，这里尝试读取，兜底用示例中的 5001009
-            val storyId = qJo.optString("storyId",
-                qJo.optJSONObject("gateDetail")?.optString("storyId", "5001009") ?: "5001009")
+            
+            // 获取返回中的推荐 storyId，如果没有则使用默认的第一个
+            val recommendedStoryId = qJo.optString("storyId",
+                qJo.optJSONObject("gateDetail")?.optString("storyId", STORY_IDS.first().toString()) ?: STORY_IDS.first().toString())
 
-            val completeResp =Credit2101RpcCall.completeEventGate(
-                batchNo, eventId, cityCode, latitude, longitude, storyId
+            Log.record(TAG, "信用2101📖[故事事件] 开始批量提交，推荐storyId: $recommendedStoryId")
+
+            // 批量完成故事事件
+            val completeResults = Credit2101RpcCall.batchCompleteEventGateWithIntIds(
+                batchNo, eventId, cityCode, latitude, longitude, STORY_IDS
             )
 
+            var successCount = 0
+            var totalGainAmount = 0
+            val gainBuffs = mutableListOf<String>()
 
-            if (!ResChecker.checkRes(TAG, completeResp)) {
-                Log.record(TAG, "信用2101📖[故事事件完成失败] resp=$completeResp")
-                return
-            }
-            val cJo = JSONObject(completeResp)
-            val gainBuff = cJo.optJSONObject("gainBuffVO")
-            if (gainBuff != null) {
-                val buffId = gainBuff.optString("buffConfigId", "")
-                val detail = gainBuff.optJSONObject("buffDetail")
-                val actionDesc = detail?.optString("buffActionDesc", "") ?: ""
-                val amount = detail?.optInt("amount", 0) ?: 0
-
-                if (amount > 0 && actionDesc.isNotEmpty()) {
-                    Log.other( "信用2101📖[故事事件完成] 获得增益 $actionDesc +$amount ($buffId)")
+            // 处理所有结果
+            for ((index, completeResp) in completeResults.withIndex()) {
+                if (!ResChecker.checkRes(TAG, completeResp)) {
+                    Log.record(TAG, "信用2101📖[故事事件${index + 1}完成失败] storyId=${STORY_IDS[index]} resp=$completeResp")
+                    continue
+                }
+                
+                val cJo = JSONObject(completeResp)
+                val gainBuff = cJo.optJSONObject("gainBuffVO")
+                
+                if (gainBuff != null) {
+                    val buffId = gainBuff.optString("buffConfigId", "")
+                    val detail = gainBuff.optJSONObject("buffDetail")
+                    val actionDesc = detail?.optString("buffActionDesc", "") ?: ""
+                    val amount = detail?.optInt("amount", 0) ?: 0
+                    
+                    if (amount > 0 && actionDesc.isNotEmpty()) {
+                        successCount++
+                        totalGainAmount += amount
+                        gainBuffs.add("$actionDesc+$amount($buffId)")
+                        Log.other("信用2101📖[故事事件${index + 1}完成] storyId=${STORY_IDS[index]} 获得增益 $actionDesc +$amount ($buffId)")
+                    } else {
+                        Log.other("信用2101📖[故事事件${index + 1}完成] storyId=${STORY_IDS[index]} buff=$buffId")
+                    }
                 } else {
-                    Log.other( "信用2101📖[故事事件完成] buff=$buffId")
+                    Log.other("信用2101📖[故事事件${index + 1}完成] storyId=${STORY_IDS[index]}")
+                }
+                
+                // 添加适当延迟避免请求过于频繁
+                if (index < completeResults.size - 1) {
+                    try {
+                        Thread.sleep(300)
+                    } catch (e: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        break
+                    }
+                }
+            }
+
+            // 汇总统计
+            if (successCount > 0) {
+                Log.other("信用2101📖[故事事件批量完成统计] 成功:$successCount/${STORY_IDS.size} 总增益:+$totalGainAmount")
+                if (gainBuffs.isNotEmpty()) {
+                    Log.other("信用2101📖[故事事件增益详情] ${gainBuffs.joinToString(" | ")}")
                 }
             } else {
-                Log.other( "信用2101📖[故事事件完成]")
+                Log.record(TAG, "信用2101📖[故事事件批量完成] 所有storyId均未获得增益")
             }
+            
         } catch (e: Throwable) {
             Log.printStackTrace(TAG, e)
         }

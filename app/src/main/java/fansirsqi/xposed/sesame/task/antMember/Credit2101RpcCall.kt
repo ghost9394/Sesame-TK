@@ -547,4 +547,70 @@ object Credit2101RpcCall {
             data
         )
     }
+
+    /**
+     * 批量完成故事事件（时空之门）
+     * 
+     * @param batchNo 批次号
+     * @param eventId 事件ID
+     * @param cityCode 城市代码
+     * @param latitude 纬度
+     * @param longitude 经度
+     * @param storyIds 故事ID数组
+     * @return 所有故事的完成结果列表
+     */
+    fun batchCompleteEventGate(
+        batchNo: String,
+        eventId: String,
+        cityCode: String,
+        latitude: Double,
+        longitude: Double,
+        storyIds: List<String>
+    ): List<String> {
+        val results = mutableListOf<String>()
+        
+        for (storyId in storyIds) {
+            val result = completeEventGate(batchNo, eventId, cityCode, latitude, longitude, storyId)
+            results.add(result)
+            
+            // 添加适当延迟避免请求过于频繁
+            try {
+                Thread.sleep(200)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                break
+            }
+        }
+        
+        return results
+    }
+
+    /**
+     * 批量完成故事事件（时空之门）- 整数数组版本
+     * 
+     * @param batchNo 批次号
+     * @param eventId 事件ID
+     * @param cityCode 城市代码
+     * @param latitude 纬度
+     * @param longitude 经度
+     * @param storyIds 故事ID整数数组
+     * @return 所有故事的完成结果列表
+     */
+    fun batchCompleteEventGateWithIntIds(
+        batchNo: String,
+        eventId: String,
+        cityCode: String,
+        latitude: Double,
+        longitude: Double,
+        storyIds: List<Int>
+    ): List<String> {
+        return batchCompleteEventGate(
+            batchNo, 
+            eventId, 
+            cityCode, 
+            latitude, 
+            longitude, 
+            storyIds.map { it.toString() }
+        )
+    }
 }
