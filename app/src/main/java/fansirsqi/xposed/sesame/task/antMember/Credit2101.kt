@@ -3,6 +3,7 @@ package fansirsqi.xposed.sesame.task.antMember
 import android.annotation.SuppressLint
 import fansirsqi.xposed.sesame.data.StatusFlags
 import fansirsqi.xposed.sesame.hook.internal.LocationHelper
+import fansirsqi.xposed.sesame.newutil.DataStore
 import fansirsqi.xposed.sesame.newutil.TaskBlacklist.autoAddToBlacklist
 import fansirsqi.xposed.sesame.newutil.TaskBlacklist.isTaskInBlacklist
 import fansirsqi.xposed.sesame.util.GlobalThreadPools
@@ -1337,70 +1338,112 @@ object Credit2101 {
             //1001043 是沈万三
             //4001018 是郑和
             
-            // 获取返回中的推荐 storyId，如果没有则使用默认的第一个
-            val recommendedStoryId = qJo.optString("storyId",
-                qJo.optJSONObject("gateDetail")?.optString("storyId", STORY_IDS.first().toString()) ?: STORY_IDS.first().toString())
-
-            Log.record(TAG, "信用2101📖[故事事件] 开始批量提交，推荐storyId: $recommendedStoryId")
+            Log.record(TAG, "信用2101📖[故事事件] 开始批量提交")
 
             // 批量完成故事事件
-            val completeResults = Credit2101RpcCall.batchCompleteEventGateWithIntIds(
-                batchNo, eventId, cityCode, latitude, longitude, STORY_IDS
-            )
-
+            val results = mutableListOf<String>()
+            for (storyId in STORY_IDS) {
+                val storyIdStr = storyId.toString()
+                val dataKey = "credit2101_story_${storyId}"
+                
+                // 检查是否已经处理过这个storyId
+                val isProcessed = DataStore.get(dataKey, Boolean::class.java) ?: false
+                if (isProcessed) {
+                    Log.record(TAG, "信用2101📖[故事事件${storyId}] 已处理过，跳过")
+                    continue
+                }
+                try {
+                    val result = Credit2101RpcCall.completeEventGate(batchNo, eventId, cityCode, latitude, longitude, storyIdStr)
+                    results.add(result)
+                    
+                    // 检查处理结果
+                    try {
+                        val resultJson = JSONObject(result)
+                        val resultCode = resultJson.optString("resultCode", "")
+                        if (resultJson.optString("resultMsg", "").contains("资产流水重复处理")) {
+                            // 标记为已处理（遇到重复错误说明已经处理过了）
+                            DataStore.put(dataKey, true)
+                            Log.record(TAG, "信用2101📖[故事事件${storyId}] 检测到重复处理，标记为已处理")
+                            break
+                        } else if (ResChecker.checkRes(TAG, result)) {
+                            // 处理成功，标记为已处理
+                            DataStore.put(dataKey, true)
+                            Log.record(TAG, "信用2101📖[故事事件${storyId}] 处理成功，标记为已处理")
+                        } else {
+                            Log.record(TAG, "信用2101📖[故事事件${storyId}] 处理失败: $resultCode")
+                        }
+                    } catch (_: Exception) {
+                        // JSON解析失败，但也要标记避免重复尝试
+                        DataStore.put(dataKey, true)
+                        Log.record(TAG, "信用2101📖[故事事件${storyId}] JSON解析失败，标记为已处理避免重试")
+                    }
+                    
+                } catch (e: Exception) {
+                    // 单个storyId处理失败，也要标记避免重复尝试
+                    DataStore.put(dataKey, true)
+                    results.add("""{"success":false,"resultMsg":"处理异常: ${e.message}"}""")
+                    Log.record(TAG, "信用2101📖[故事事件${storyId}] 处理异常，标记为已处理: ${e.message}")
+                }
+                // 添加适当延迟避免请求过于频繁
+                try {
+                    Thread.sleep(800) // 增加延迟到800ms
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
+                }
+            }
             var successCount = 0
             var totalGainAmount = 0
             val gainBuffs = mutableListOf<String>()
-
             // 处理所有结果
-            for ((index, completeResp) in completeResults.withIndex()) {
-                if (!ResChecker.checkRes(TAG, completeResp)) {
-                    Log.record(TAG, "信用2101📖[故事事件${index + 1}完成失败] storyId=${STORY_IDS[index]} resp=$completeResp")
-                    continue
-                }
-                
-                val cJo = JSONObject(completeResp)
-                val gainBuff = cJo.optJSONObject("gainBuffVO")
-                
-                if (gainBuff != null) {
-                    val buffId = gainBuff.optString("buffConfigId", "")
-                    val detail = gainBuff.optJSONObject("buffDetail")
-                    val actionDesc = detail?.optString("buffActionDesc", "") ?: ""
-                    val amount = detail?.optInt("amount", 0) ?: 0
-                    
-                    if (amount > 0 && actionDesc.isNotEmpty()) {
-                        successCount++
-                        totalGainAmount += amount
-                        gainBuffs.add("$actionDesc+$amount($buffId)")
-                        Log.other("信用2101📖[故事事件${index + 1}完成] storyId=${STORY_IDS[index]} 获得增益 $actionDesc +$amount ($buffId)")
+            val repeatErrorCount = 0
+            var otherErrorCount = 0
+            for ((index, completeResp) in results.withIndex()) {
+                if (index >= STORY_IDS.size) break // 安全检查
+                val currentStoryId = STORY_IDS[index]
+                try {
+                    // 检查是否为重复处理错误
+                    val respJson = JSONObject(completeResp)
+                    if (!ResChecker.checkRes(TAG, completeResp)) {
+                        otherErrorCount++
+                        Log.record(TAG, "信用2101📖[故事事件${index + 1}完成失败] storyId=$currentStoryId resp=$completeResp")
+                        continue
+                    }
+                    val gainBuff = respJson.optJSONObject("gainBuffVO")
+                    if (gainBuff != null) {
+                        val buffId = gainBuff.optString("buffConfigId", "")
+                        val detail = gainBuff.optJSONObject("buffDetail")
+                        val actionDesc = detail?.optString("buffActionDesc", "") ?: ""
+                        val amount = detail?.optInt("amount", 0) ?: 0
+                        
+                        if (amount > 0 && actionDesc.isNotEmpty()) {
+                            successCount++
+                            totalGainAmount += amount
+                            gainBuffs.add("$actionDesc+$amount($buffId)")
+                            Log.other("信用2101📖[故事事件${index + 1}完成] storyId=$currentStoryId 获得增益 $actionDesc +$amount ($buffId)")
+                        } else {
+                            Log.other("信用2101📖[故事事件${index + 1}完成] storyId=$currentStoryId buff=$buffId")
+                        }
                     } else {
-                        Log.other("信用2101📖[故事事件${index + 1}完成] storyId=${STORY_IDS[index]} buff=$buffId")
+                        Log.other("信用2101📖[故事事件${index + 1}完成] storyId=$currentStoryId")
                     }
-                } else {
-                    Log.other("信用2101📖[故事事件${index + 1}完成] storyId=${STORY_IDS[index]}")
-                }
-                
-                // 添加适当延迟避免请求过于频繁
-                if (index < completeResults.size - 1) {
-                    try {
-                        Thread.sleep(300)
-                    } catch (e: InterruptedException) {
-                        Thread.currentThread().interrupt()
-                        break
-                    }
+                    
+                } catch (e: Exception) {
+                    otherErrorCount++
+                    Log.record(TAG, "信用2101📖[故事事件${index + 1}处理异常] storyId=$currentStoryId error=${e.message}")
                 }
             }
-
             // 汇总统计
+            val processedCount = successCount + repeatErrorCount + otherErrorCount
+            Log.record(TAG, "信用2101📖[故事事件批量完成统计] 成功:$successCount 重复错误:$repeatErrorCount 其他错误:$otherErrorCount 已处理:$processedCount/${STORY_IDS.size}")
+            
             if (successCount > 0) {
-                Log.other("信用2101📖[故事事件批量完成统计] 成功:$successCount/${STORY_IDS.size} 总增益:+$totalGainAmount")
+                Log.other("信用2101📖[故事事件总增益:+$totalGainAmount")
                 if (gainBuffs.isNotEmpty()) {
                     Log.other("信用2101📖[故事事件增益详情] ${gainBuffs.joinToString(" | ")}")
                 }
-            } else {
-                Log.record(TAG, "信用2101📖[故事事件批量完成] 所有storyId均未获得增益")
             }
-            
+
         } catch (e: Throwable) {
             Log.printStackTrace(TAG, e)
         }
