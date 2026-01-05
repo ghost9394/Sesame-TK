@@ -164,6 +164,11 @@ public class Files {
         return write2File(json, new File(CONFIG_DIR + File.separator + userId, "config_v2.json"));
     }
 
+    // ✨ 新增：获取自定义设置文件路径
+    public static File getCustomSetFile(String userId) {
+        return getTargetFileofUser(userId, "customset.json");
+    }
+
     public static synchronized File getTargetFileofUser(String userId, String fullTargetFileName) {
         if (userId == null || userId.isEmpty()) {
             Log.error(TAG, "Invalid userId for target file: " + fullTargetFileName);
@@ -519,7 +524,7 @@ public class Files {
                 } catch (IOException e) {
                     // 捕获 close 时的异常（包括 EPERM）
                     // 数据已经 flush，close 失败不影响写入结果
-                    Log.debug(TAG, "文件关闭异常（数据已写入）: " + e.getMessage());
+                     Log.record(TAG, "文件关闭异常（数据已写入）: " + e.getMessage());
                 }
             }
         }

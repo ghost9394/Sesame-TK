@@ -24,7 +24,7 @@ class AntCooperate : ModelTask() {
      *
      * @return 合种任务名称
      */
-    override fun getName(): String? {
+    override fun getName(): String {
         return "蚂蚁森林合种" //保留这个全称
     }
 
@@ -84,7 +84,7 @@ class AntCooperate : ModelTask() {
      *
      * @return 是否可以执行合种任务
      */
-    override fun check(): Boolean? {
+    override fun check(): Boolean {
         if (TaskCommon.IS_ENERGY_TIME) {
             Log.record(TAG, "⏸ 当前为只收能量时间【" + BaseModel.energyTime.value + "】，停止执行" + name + "任务！")
             return false
@@ -339,8 +339,8 @@ class AntCooperate : ModelTask() {
             if (!isTeam(homeJo)) {
 
                 val updateUserConfigStr = AntCooperateRpcCall.updateUserConfig(true)
-                val UserConfigJo = JSONObject(updateUserConfigStr)
-                if (!ResChecker.checkRes(TAG, UserConfigJo)) {
+                val userConfigJo = JSONObject(updateUserConfigStr)
+                if (!ResChecker.checkRes(TAG, userConfigJo)) {
                     Log.record(TAG, "updateUserConfig 返回异常")
                     return
                 }
@@ -396,8 +396,8 @@ class AntCooperate : ModelTask() {
             if (needReturn) {
 
                 val updateUserConfigStr = AntCooperateRpcCall.updateUserConfig(false)
-                val UserConfigJo = JSONObject(updateUserConfigStr)
-                if (!ResChecker.checkRes(TAG, UserConfigJo)) {
+                val userConfigJo = JSONObject(updateUserConfigStr)
+                if (!ResChecker.checkRes(TAG, userConfigJo)) {
                     Log.record(TAG, "updateUserConfig 返回异常")
                     return
                 }
