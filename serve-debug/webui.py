@@ -131,7 +131,7 @@ def get_injection_script():
             }},
             
             isNightMode: function() {{
-                return true;
+                return false;
             }},
             
             getModel: function(modelCode) {{
@@ -214,4 +214,4 @@ if __name__ == "__main__":
     import uvicorn
 
     print(f"正在启动服务: http://127.0.0.1:8080/index.html")
-    uvicorn.run("webui_debug:app", host="127.0.0.1", port=8080, reload=True)
+    uvicorn.run("webui:app", host="127.0.0.1", port=8080, reload=True)

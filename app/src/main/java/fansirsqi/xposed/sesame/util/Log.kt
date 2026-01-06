@@ -125,6 +125,22 @@ object Log {
         capture("[$tag]: $msg")
     }
 
+    fun d(tag: String, msg: String) {
+        DEBUG_LOGGER.debug("[$tag]: $msg")
+    }
+
+    fun i(tag: String, msg: String) {
+        RECORD_LOGGER.info("[$tag]: $msg")
+    }
+
+    fun w(tag: String, msg: String) {
+        RECORD_LOGGER.warn("[$tag]: $msg")
+    }
+
+    fun e(tag: String, msg: String, th: Throwable?=null) {
+        ERROR_LOGGER.error("[$tag]: $msg ${android.util.Log.getStackTraceString(th)}")
+    }
+
 
     /**
      * 检查是否应该打印此错误（去重机制）

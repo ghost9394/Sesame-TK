@@ -162,7 +162,7 @@ object UserMap {
     @Synchronized
     fun save(userId: String?): Boolean {
         if (userId.isNullOrEmpty()) return false
-        return Files.write2File(JsonUtil.formatJson(userMap), Files.getFriendIdMapFile(userId))
+        return Files.write2File(JsonUtil.formatJson(userMap), Files.getFriendIdMapFile(userId)!!)
     }
 
     /**
@@ -175,7 +175,7 @@ object UserMap {
         if (userId.isNullOrEmpty()) return
 
         try {
-            val body = Files.readFromFile(Files.getSelfIdFile(userId))
+            val body = Files.readFromFile(Files.getSelfIdFile(userId)!!)
             if (body.isNotEmpty()) {
                 val dto: UserEntity.UserDto? = JsonUtil.parseObject(
                     body,
@@ -207,6 +207,6 @@ object UserMap {
             Log.record(TAG, "update now active user: $userEntity")
         }
         val body = JsonUtil.formatJson(userEntity)
-        Files.write2File(body, Files.getSelfIdFile(userEntity?.userId))
+        Files.write2File(body, Files.getSelfIdFile(userEntity?.userId)!!)
     }
 }

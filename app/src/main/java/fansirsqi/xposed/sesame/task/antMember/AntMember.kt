@@ -1,7 +1,6 @@
 package fansirsqi.xposed.sesame.task.antMember
 
 import android.annotation.SuppressLint
-import fansirsqi.xposed.sesame.data.Status
 import fansirsqi.xposed.sesame.data.Status.Companion.canMemberPointExchangeBenefitToday
 import fansirsqi.xposed.sesame.data.Status.Companion.canMemberSignInToday
 import fansirsqi.xposed.sesame.data.Status.Companion.hasFlagToday
@@ -82,9 +81,6 @@ class AntMember : ModelTask() {
     //年度回顾
     private var annualReview: BooleanModelField? = null
 
-    //年度回顾
-    private var receiveSticker: BooleanModelField? = null
-
     // 黄金票配置 - 签到
     private var enableGoldTicket: BooleanModelField? = null
 
@@ -92,11 +88,8 @@ class AntMember : ModelTask() {
     private var enableGoldTicketConsume: BooleanModelField? = null
 
 
-    /** @brief 信用2101功能开关 */
-    private var credit2101: BooleanModelField? = null
-
-    /** @brief 账单 贴纸 功能开关 */
-    private var CollectStickers: BooleanModelField? = null
+    /** 账单 贴纸 功能开关 */
+    private var collectStickers: BooleanModelField? = null
 
     override fun getFields(): ModelFields {
         val modelFields = ModelFields()
@@ -163,13 +156,8 @@ class AntMember : ModelTask() {
         modelFields.addField(BooleanModelField("annualReview", "年度回顾", false).also { annualReview = it })
 
 
-        credit2101 = BooleanModelField("credit2101", "信用2101", false)
-        modelFields.addField(credit2101)
-
-
-
-        CollectStickers = BooleanModelField("CollectStickers", "领取贴纸", false)
-        modelFields.addField(CollectStickers)
+        collectStickers = BooleanModelField("CollectStickers", "领取贴纸", false)
+        modelFields.addField(collectStickers)
 
 
 
@@ -305,12 +293,8 @@ class AntMember : ModelTask() {
 
 
 
-                if (credit2101!!.value) {
-                    record(TAG, "执行开始 信用2101")
-                    Credit2101.doCredit2101()
-                    record(TAG, "执行结束 信用2101")
-                }
-                if (CollectStickers!!.value) {
+
+                if (collectStickers!!.value) {
                     queryAndCollectStickers()
                 }
 
@@ -359,7 +343,7 @@ class AntMember : ModelTask() {
             }
             // 成长引导列表（不会用，只做计数）
             val growthGuideList = root.optJSONArray("growthGuideList")
-            val guideCount = growthGuideList?.length() ?: 0
+            growthGuideList?.length() ?: 0
 
             // 待处理任务列表
             val toDoList = root.optJSONArray("toDoList")
@@ -2250,9 +2234,8 @@ class AntMember : ModelTask() {
             if ("NOT_DONE" == status || "SIGNUP_COMPLETE" == status) {
                 // SIGNUP_COMPLETE 通常表示已报名但未做，或者对于复访任务表示可以去完成
                 record("芝麻树🌳[开始任务] " + title + (if (prizeName.isEmpty()) "" else " ($prizeName)"))
-                if (performTask(taskId, title, prizeName)) {
-                    // 任务完成
-                }
+                performTask(taskId, title, prizeName)
+                // 任务完成
             } else if ("TO_RECEIVE" == status) {
                 // 待领取状态
                 if (doTaskAction(taskId, "receive")) {
@@ -2431,7 +2414,7 @@ class AntMember : ModelTask() {
     @SuppressLint("DefaultLocale")
     fun queryAndCollectStickers() {
         try {
-            if (Status.hasFlagToday(StatusFlags.FLAG_AntMember_STICKER)) {
+            if (hasFlagToday(StatusFlags.FLAG_AntMember_STICKER)) {
                 record(TAG, "今日已兑换贴纸，跳过")
                 return
             }
@@ -2507,10 +2490,10 @@ class AntMember : ModelTask() {
             }
 
             // 标记今日完成
-            Status.setFlagToday(StatusFlags.FLAG_AntMember_STICKER)
+            setFlagToday(StatusFlags.FLAG_AntMember_STICKER)
 
         } catch (e: Exception) {
-            Log.printStackTrace(TAG + " stickerAutoCollect err", e)
+            Log.printStackTrace("$TAG stickerAutoCollect err", e)
         }
     }
 

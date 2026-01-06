@@ -1,7 +1,6 @@
 package fansirsqi.xposed.sesame.hook;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.app.Application;
 import android.app.Service;
 import android.content.*;
@@ -322,10 +321,7 @@ public class ApplicationHook {
 
     @SuppressLint("PrivateApi")
     private void handleHookLogic(ClassLoader classLoader, String packageName, String apkPath, Object rawParam) {
-        DataStore.INSTANCE.init(Files.CONFIG_DIR);
-        if (hooked) return;
-        hooked = true;
-
+        // 1. 获取进程名
         String processName = null;
         if (rawParam instanceof XC_LoadPackage.LoadPackageParam) {
             processName = ((XC_LoadPackage.LoadPackageParam) rawParam).processName;
@@ -333,6 +329,24 @@ public class ApplicationHook {
             processName = XposedEnv.INSTANCE.getProcessName();
         }
         finalProcessName = processName;
+
+        // 2. 【关键修复】进程过滤
+        // 判断是否为主进程
+        boolean isMainProcess = General.PACKAGE_NAME.equals(processName);
+        // 判断是否为小组件进程 (如果你有小组件功能)
+        boolean isWidgetProcess = processName != null && processName.endsWith(":widgetProvider");
+        // 如果既不是主进程，也不是小组件进程，直接退出，不执行后续任何逻辑
+        if (!isMainProcess && !isWidgetProcess) {
+            // 可以留一行日志方便调试，证明其他进程被过滤了
+            Log.record(TAG, "跳过辅助进程: " + processName);
+            return;
+        }
+
+
+        DataStore.INSTANCE.init(Files.CONFIG_DIR);
+        if (hooked) return;
+        hooked = true;
+
 
         VersionHook.installHook(classLoader);
         ReflectionCache.initialize(classLoader);
@@ -422,7 +436,7 @@ public class ApplicationHook {
                     new XC_MethodHook() {
                         @Override
                         protected void afterHookedMethod(MethodHookParam param) {
-                            String targetUid = getUserId();
+                            String targetUid = HookUtil.INSTANCE.getUserId(classLoader);
                             if (targetUid == null) {
                                 Toast.INSTANCE.show("用户未登录");
                                 return;
@@ -443,12 +457,6 @@ public class ApplicationHook {
                                 }
                                 HookUtil.INSTANCE.hookUser(classLoader);
                             }
-                            if (offline) {
-                                offline = false;
-                                execHandler();
-                                ((Activity) param.thisObject).finish();
-                            }
-                            execHandler();
                         }
                     });
         } catch (Throwable t) {
@@ -500,14 +508,12 @@ public class ApplicationHook {
                                     String currentUid = UserMap.INSTANCE.getCurrentUid();
                                     String targetUid = HookUtil.INSTANCE.getUserId(classLoader);
                                     if (targetUid == null || !targetUid.equals(currentUid)) {
-                                        reLogin();
+                                        reOpenApp();
                                         return;
                                     }
                                     lastExecTime = currentTime;
-
                                     TaskRunnerAdapter adapter = new TaskRunnerAdapter();
                                     adapter.run();
-
                                     // 任务跑完，调度下一次
                                     scheduleNextExecutionInternal(lastExecTime);
                                 } catch (IllegalStateException e) {
@@ -717,7 +723,7 @@ public class ApplicationHook {
         long inactiveTime = currentTime - lastExecTime;
         if (inactiveTime > MAX_INACTIVE_TIME) {
             Log.record(TAG, "⚠️ 检测到长时间未执行，重新登录");
-            reLogin();
+            reOpenApp();
         }
     }
 
@@ -777,61 +783,10 @@ public class ApplicationHook {
         calendar.set(Calendar.MILLISECOND, 0);
     }
 
-    public static Object getMicroApplicationContext() {
-        if (microApplicationContextObject == null) {
-            try {
-                Class<?> clazz = ReflectionCache.getAlipayApplicationClass(classLoader);
-                if (clazz == null) return null;
-                Object instance = XposedHelpers.callStaticMethod(clazz, "getInstance");
-                if (instance == null) return null;
-                microApplicationContextObject = XposedHelpers.callMethod(instance, "getMicroApplicationContext");
-            } catch (Throwable t) {
-                // ignore
-            }
-        }
-        return microApplicationContextObject;
-    }
 
-    public static Object getServiceObject(String service) {
-        try {
-            return XposedHelpers.callMethod(getMicroApplicationContext(), "findServiceByInterface", service);
-        } catch (Throwable th) {
-            return null;
-        }
-    }
-
-    public static Object getUserObject() {
-        try {
-            Class<?> clazz = ReflectionCache.getSocialSdkClass(classLoader);
-            if (clazz == null) return null;
-            return XposedHelpers.callMethod(getServiceObject(clazz.getName()), "getMyAccountInfoModelByLocal");
-        } catch (Throwable th) {
-            return null;
-        }
-    }
-
-    public static String getUserId() {
-        try {
-            Object userObject = getUserObject();
-            if (userObject != null) {
-                return (String) XposedHelpers.getObjectField(userObject, "userId");
-            }
-        } catch (Throwable th) {
-            // ignore
-        }
-        return null;
-    }
-
-    public static void reLogin() {
+    public static void reOpenApp() {
         // 重构：使用 SmartSchedulerManager 替代 Handler/Alarm
-        long delayMillis;
-        if (reLoginCount.get() < 5) {
-            delayMillis = reLoginCount.getAndIncrement() * 5000L;
-        } else {
-            delayMillis = Math.max(BaseModel.Companion.getCheckInterval().getValue(), 180_000);
-        }
-        Log.record("TAG", "🔄 准备重新登录，延迟 " + (delayMillis / 1000) + " 秒");
-
+        long delayMillis = 20_000L;
         ensureScheduler();
         SmartSchedulerManager.INSTANCE.schedule(delayMillis, "重新登录", () -> {
             try {
@@ -853,15 +808,19 @@ public class ApplicationHook {
         @Override
         public void onReceive(Context context, Intent intent) {
             try {
+                // 优化建议：显式过滤
+                if (finalProcessName != null && finalProcessName.endsWith(":widgetProvider")) {
+                    Log.record(TAG, "小组件进程收到广播，保持活跃");
+                    return;
+                }
                 String action = intent.getAction();
                 if (action != null) {
                     switch (action) {
                         case BroadcastActions.RESTART:
                             GlobalThreadPools.INSTANCE.execute(ApplicationHook::initHandler);
                             break;
-                        // 删除了 EXECUTE 和 PRE_WAKEUP 分支
                         case BroadcastActions.RE_LOGIN:
-                            reLogin();
+                            reOpenApp();
                             break;
                         case BroadcastActions.RPC_TEST:
                             GlobalThreadPools.INSTANCE.execute(() -> {
@@ -884,7 +843,6 @@ public class ApplicationHook {
         }
     }
 
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     void registerBroadcastReceiver(Context context) {
         try {
             IntentFilter intentFilter = new IntentFilter();
@@ -892,7 +850,6 @@ public class ApplicationHook {
             intentFilter.addAction(BroadcastActions.RE_LOGIN);
             intentFilter.addAction(BroadcastActions.STATUS);
             intentFilter.addAction(BroadcastActions.RPC_TEST);
-
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 context.registerReceiver(new AlipayBroadcastReceiver(), intentFilter, Context.RECEIVER_EXPORTED);
             } else {

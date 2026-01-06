@@ -5,7 +5,6 @@ import androidx.appcompat.app.AlertDialog
 import fansirsqi.xposed.sesame.R
 import fansirsqi.xposed.sesame.data.Status
 import fansirsqi.xposed.sesame.entity.MapperEntity
-import fansirsqi.xposed.sesame.hook.ApplicationHook
 import fansirsqi.xposed.sesame.model.modelFieldExt.BooleanModelField
 import fansirsqi.xposed.sesame.model.modelFieldExt.SelectModelField
 import fansirsqi.xposed.sesame.ui.widget.ListDialog
@@ -108,7 +107,7 @@ object CustomSettings {
             data[onlyOnceDailyList.code] = onlyOnceDailyList.value
             data[autoHandleOnceDaily.code] = autoHandleOnceDaily.value
             val json = JsonUtil.formatJson(data)
-            if (json != null) Files.write2File(json, file)
+            if (json != null) Files.write2File(json, file!!)
         } catch (e: Throwable) {
             Log.printStackTrace(TAG, "Failed to save custom settings", e)
         }
@@ -119,7 +118,7 @@ object CustomSettings {
         if (userId.isEmpty()) return
         try {
             val file = Files.getCustomSetFile(userId)
-            if (!file.exists()) {
+            if (!file!!.exists()) {
                 resetToDefault()
                 return
             }
@@ -137,13 +136,11 @@ object CustomSettings {
         }
     }
 
-    @JvmStatic
     fun loadForTaskRunner() {
-        val currentUid = ApplicationHook.getUserId() ?: UserMap.currentUid
+        val currentUid = UserMap.currentUid
         if (!currentUid.isNullOrEmpty()) load(currentUid)
     }
 
-    @JvmStatic
     fun getModuleId(taskInfo: String?): String? {
         if (taskInfo == null) return null
         return when {
@@ -159,11 +156,11 @@ object CustomSettings {
             taskInfo.contains("生态保护") || taskInfo.contains("EcoProtection") -> "EcoProtection"
             taskInfo.contains("绿色经营") || taskInfo.contains("greenFinance") -> "greenFinance"
             taskInfo.contains("保护地") || taskInfo.contains("reserve") -> "reserve"
+            taskInfo.contains("其他") || taskInfo.contains("other") -> "other"
             else -> null
         }
     }
 
-    @JvmStatic
     fun isOnceDailyBlackListed(taskInfo: String?, status: OnceDailyStatus? = null): Boolean {
         val s = status ?: getOnceDailyStatus(false)
         // 只有当单次运行模式生效，且今日已经完成过首轮全量运行的情况下，才执行黑名单排除
@@ -184,7 +181,11 @@ object CustomSettings {
     @JvmStatic
     fun getOnceDailyStatus(enableLog: Boolean = false): OnceDailyStatus {
         val configEnabled = onlyOnceDaily.value == true
-        val isFinished = try { Status.hasFlagToday("OnceDaily::Finished") } catch (e: Throwable) { false }
+        val isFinished = try {
+            Status.hasFlagToday("OnceDaily::Finished")
+        } catch (e: Throwable) {
+            false
+        }
 
         val isSpecialTime = TimeUtil.checkNowInTimeRange("0600-0710") ||
                 TimeUtil.checkNowInTimeRange("2000-2100")
@@ -228,7 +229,11 @@ object CustomSettings {
     }
 
     private fun showAccountOps(context: Context, uid: String, showName: String, onRefresh: () -> Unit) {
-        val isFinished = try { Status.hasFlagToday("OnceDaily::Finished") } catch (e: Throwable) { false }
+        val isFinished = try {
+            Status.hasFlagToday("OnceDaily::Finished")
+        } catch (e: Throwable) {
+            false
+        }
         val statusText = when {
             !onlyOnceDaily.value -> "单次运行：已关闭"
             autoHandleOnceDaily.value -> "单次运行：自动模式"
@@ -261,7 +266,8 @@ object CustomSettings {
                         dialogField.isAccessible = true
                         val dialog = dialogField.get(null) as? androidx.appcompat.app.AlertDialog
                         dialog?.setOnDismissListener { save(uid) }
-                    } catch (e: Exception) {}
+                    } catch (e: Exception) {
+                    }
                 }
             }
             .setNegativeButton("返回", null)
