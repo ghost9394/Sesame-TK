@@ -140,7 +140,7 @@ fun LogViewerScreen(
     LaunchedEffect(filePath) {
         viewModel.loadLogs(filePath)
         viewModel.scrollEvent.collect { index ->
-            if (index >= 0 && index < state.mappingList.size) {
+            if (index >= 0 && index < state.totalCount) {
                 try {
                     listState.scrollToItem(index)
                 } catch (e: Exception) {
@@ -251,7 +251,7 @@ fun LogViewerScreen(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    if (state.isLoading) "Loading..." else "${state.mappingList.size} lines",
+                                    if (state.isLoading) "Loading..." else "${state.totalCount} lines",
                                     style = MaterialTheme.typography.bodySmall,
                                     // ✅ 统一颜色
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -324,7 +324,7 @@ fun LogViewerScreen(
                                             onClick = {
                                                 showMenu = false
                                                 scope.launch {
-                                                    val lastIndex = (state.mappingList.size - 1).coerceAtLeast(0)
+                                                    val lastIndex = (state.totalCount - 1).coerceAtLeast(0)
                                                     listState.scrollToItem(lastIndex)
                                                 }
                                             },
@@ -420,7 +420,7 @@ fun LogViewerScreen(
                         contentPadding = PaddingValues(start = 8.dp, end = 16.dp, top = 2.dp, bottom = 2.dp)
                     ) {
                         items(
-                            count = state.mappingList.size,
+                            count = state.totalCount,
                             key = { index -> index },
                             contentType = { 1 } // 🔥 显式指定 contentType，帮助 Compose 复用节点
                         ) { index ->
@@ -433,7 +433,7 @@ fun LogViewerScreen(
                         }
                     }
                 }
-                DraggableScrollbar(listState = listState, totalItems = state.mappingList.size, modifier = Modifier.align(Alignment.CenterEnd))
+                DraggableScrollbar(listState = listState, totalItems = state.totalCount, modifier = Modifier.align(Alignment.CenterEnd))
             }
 
             if (!state.autoScroll && !state.isSearching) {
