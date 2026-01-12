@@ -215,6 +215,12 @@ public class ChouChouLe {
             }
 
             // 普通任务
+            if (task.title.equals("消耗饲料换机会")) {
+                if (AntFarm.foodStock < 90) {
+                    Log.record(TAG, "饲料余量(" + AntFarm.foodStock + "g)少于90g，跳过任务: " + task.title);
+                    return false; // 返回 false 避免 doubleCheck，且不执行后续 RPC
+                }
+            }
             String s = AntFarmRpcCall.chouchouleDoFarmTask(drawType, task.taskId);
             JSONObject jo = new JSONObject(s);
             if (ResChecker.checkRes(TAG, jo)) {
