@@ -343,7 +343,6 @@ public class ApplicationHook {
         finalProcessName = processName;
 
 
-
         // 2. 【关键修复】进程过滤
         // 判断是否为主进程
         boolean isMainProcess = General.PACKAGE_NAME.equals(processName);
@@ -413,13 +412,15 @@ public class ApplicationHook {
                     loadNativeLibs(appContext, AssetUtil.INSTANCE.getCheckerDestFile());
                     loadNativeLibs(appContext, AssetUtil.INSTANCE.getDexkitDestFile());
 
-                    if (VersionHook.hasVersion() && "10.7.26.8100".equals(alipayVersion.getVersionString())) {
+                    if (VersionHook.hasVersion()
+                            && alipayVersion.compareTo(new AlipayVersion("10.7.26.8100")) == 0) {
                         HookUtil.INSTANCE.fuckAccounLimit(classLoader);
                     }
 
+
                     if (VersionHook.hasVersion() && alipayVersion.getVersionString() != null) {
-                        String version = alipayVersion.getVersionString();
-                        if (version.matches("^([0-9]\\.[0-9]+\\.[0-9]+\\.[0-9]+|10\\.[0-5]\\.[0-9]+\\.[0-9]+|10\\.6\\.([0-9]|[0-4][0-9]|5[0-8])\\.[0-9]+)$")) {
+                        AlipayVersion max = new AlipayVersion("10.6.58");
+                        if (alipayVersion.compareTo(max) <= 0) {
                             SimplePageManager.INSTANCE.enableWindowMonitoring(classLoader);
                             SimplePageManager.INSTANCE.addHandler(
                                     "com.alipay.mobile.nebulax.xriver.activity.XRiverActivity",
