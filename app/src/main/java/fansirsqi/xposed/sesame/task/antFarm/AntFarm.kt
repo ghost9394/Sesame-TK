@@ -29,6 +29,7 @@ import fansirsqi.xposed.sesame.task.ModelTask
 import fansirsqi.xposed.sesame.task.antFarm.AntFarmFamily.familyClaimRewardList
 import fansirsqi.xposed.sesame.task.antFarm.AntFarmFamily.familySign
 import fansirsqi.xposed.sesame.task.antForest.TaskTimeChecker
+import fansirsqi.xposed.sesame.util.CoroutineUtils
 import fansirsqi.xposed.sesame.util.JsonUtil
 import fansirsqi.xposed.sesame.util.ListUtil
 import fansirsqi.xposed.sesame.util.Log
@@ -244,6 +245,8 @@ class AntFarm : ModelTask() {
     private var paradiseCoinExchangeBenefitList: SelectModelField? = null
 
     private var visitAnimal: BooleanModelField? = null
+    private var hasFence: Boolean = false       // 是否正在使用篱笆
+    private var fenceCountDown: Int = 0
 
     override fun getFields(): ModelFields {
         val modelFields = ModelFields()
@@ -587,6 +590,7 @@ class AntFarm : ModelTask() {
 
     override fun boot(classLoader: ClassLoader?) {
         super.boot(classLoader)
+        instance = this
         addIntervalLimit("com.alipay.antfarm.enterFarm", 2000)
     }
 
@@ -2371,7 +2375,7 @@ class AntFarm : ModelTask() {
     /**
      * 加载持有道具信息
      */
-    private fun listFarmTool() {
+    private fun listFarmTool(): List<FarmTool>? {
         try {
             var jo = JSONObject(AntFarmRpcCall.listFarmTool())
             if (ResChecker.checkRes(TAG, jo)) {
@@ -2387,10 +2391,12 @@ class AntFarm : ModelTask() {
                     tempList.add(tool)
                 }
                 farmTools = tempList.toTypedArray()
+                return tempList
             }
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "listFarmTool err:", t)
         }
+        return null
     }
     private val accelerateToolCount: Int
         get() = farmTools.find { it.toolType == ToolType.ACCELERATETOOL }?.toolCount ?: 0
@@ -2566,6 +2572,10 @@ class AntFarm : ModelTask() {
                     if (toolType.name == jo.getString("toolType")) {
                         val toolCount = jo.getInt("toolCount")
                         if (toolCount > 0) {
+                            if (toolType == ToolType.FENCETOOL && hasFence) {
+                                Log.record(TAG, "🛡️ 篱笆效果尚在（剩余${fenceCountDown/60}分钟），跳过重复使用")
+                                return false
+                            }
                             var toolId = ""
                             if (jo.has("toolId")) toolId = jo.getString("toolId")
                             s = AntFarmRpcCall.useFarmTool(targetFarmId, toolId, toolType.name)
@@ -2573,6 +2583,10 @@ class AntFarm : ModelTask() {
                             memo = jo.getString("memo")
                             if (ResChecker.checkRes(TAG, jo)) {
                                 Log.farm("使用了道具🎭[" + toolType.nickName() + "]#剩余" + (toolCount - 1) + "张")
+                                if (toolType == ToolType.FENCETOOL) {
+                                    hasFence = true
+                                    fenceCountDown = 86400
+                                }
                                 listFarmTool()
                                 return true
                             } else {
@@ -2869,6 +2883,21 @@ class AntFarm : ModelTask() {
                 }
             }
 
+            if (jo.has("buffInfoVO")) {
+                val buffInfo = jo.getJSONObject("buffInfoVO")
+                val buffType = buffInfo.optString("buffType")
+                if (buffType == "FENCE") {
+                    hasFence = buffInfo.optBoolean("hasBuffEffect", false)
+                    fenceCountDown = buffInfo.optInt("buffCountDown", 0)
+                    if (hasFence) {
+                        Log.record(TAG, "🛡️ 篱笆生效中，剩余时间: ${fenceCountDown / 3600}小时${(fenceCountDown % 3600) / 60}分")
+                    }
+                }
+            } else {
+                hasFence = false
+                fenceCountDown = 0
+            }
+
             val jaAnimals = subFarmVO.getJSONArray("animals") //小鸡们
             val animalList: MutableList<Animal> = ArrayList()
             for (i in 0..<jaAnimals.length()) {
@@ -2992,26 +3021,47 @@ class AntFarm : ModelTask() {
         }
     }
 
-    private fun useSpecialFood(cuisineList: JSONArray) {
+    /**
+     maxUsage 本次运行总计使用的美食数量。默认为美食种类数量，即每种尝试使用一个。
+     */
+    private fun useSpecialFood(cuisineList: JSONArray, maxUsage: Int = cuisineList.length()) {
         try {
-            var jo: JSONObject
-            var cookbookId: String?
-            var cuisineId: String?
-            var name: String?
-            for (i in 0..<cuisineList.length()) {
-                jo = cuisineList.getJSONObject(i)
-                if (jo.getInt("count") <= 0) continue
-                cookbookId = jo.getString("cookbookId")
-                cuisineId = jo.getString("cuisineId")
-                name = jo.getString("name")
-                jo = JSONObject(AntFarmRpcCall.useFarmFood(cookbookId, cuisineId))
-                if (ResChecker.checkRes(TAG, jo)) {
-                    val deltaProduce = jo.getJSONObject("foodEffect").getDouble("deltaProduce")
-                    Log.farm("使用美食🍱[" + name + "]#加速" + deltaProduce + "颗爱心鸡蛋")
+            var totalUsed = 0
+            val counts = IntArray(cuisineList.length()) { i ->
+                cuisineList.getJSONObject(i).optInt("count", 0)
+            }
+            val totalFoodCount = counts.sum()
+            Log.record(TAG, "美食总量为:$totalFoodCount")
+
+            while (totalUsed < maxUsage) {
+                var usedInThisRound = false
+                for (i in 0..<cuisineList.length()) {
+                    if (totalUsed >= maxUsage) break
+
+                    if (counts[i] <= 0) continue
+                    val jo = cuisineList.getJSONObject(i)
+                    val cookbookId = jo.getString("cookbookId")
+                    val cuisineId = jo.getString("cuisineId")
+                    val name = jo.getString("name")
+
+                    val res = AntFarmRpcCall.useFarmFood(cookbookId, cuisineId)
+                    val joRes = JSONObject(res)
+
+                    if (ResChecker.checkRes(TAG, joRes)) {
+                        val deltaProduce = joRes.optJSONObject("foodEffect")?.optDouble("deltaProduce", 0.0) ?: 0.0
+                        Log.farm("使用美食🍱[$name]#加速${deltaProduce}颗爱心鸡蛋")
+                        counts[i]--
+                        totalUsed++
+                        usedInThisRound = true
+                        CoroutineUtils.sleepCompat(RandomUtil.nextInt(800, 1100).toLong())
+                    } else {
+                        counts[i] = 0
+                    }
                 }
+                if (!usedInThisRound) break
             }
         } catch (t: Throwable) {
-            Log.printStackTrace(TAG, "useFarmFood err:",t)
+            Log.printStackTrace(TAG, "useSpecialFood err:", t)
         }
     }
 
@@ -4497,6 +4547,9 @@ class AntFarm : ModelTask() {
         private val TAG: String = AntFarm::class.java.getSimpleName()
         private val objectMapper = ObjectMapper()
 
+        @JvmField
+        var instance: AntFarm? = null
+
         /**
          * 小鸡饲料g
          */
@@ -4534,5 +4587,151 @@ class AntFarm : ModelTask() {
         private const val FARM_ANSWER_CACHE_KEY = "farmAnswerQuestionCache"
         private const val ANSWERED_FLAG = "farmQuestion::answered" // 今日是否已答题
         private const val CACHED_FLAG = "farmQuestion::cache" // 是否已缓存明日答案
+    }
+
+    /**
+     * 手动触发遣返小鸡
+     */
+    fun manualSendBackAnimal() {
+        try {
+            Log.record(TAG, "🚀 开始执行手动遣返小鸡任务...")
+            // 必须先进入农场获取最新 animal 数据
+            if (enterFarm() != null) {
+                sendBackAnimal()
+                Log.record(TAG, "✅ 手动遣返指令执行完毕")
+            } else {
+                Log.record(TAG, "❌ 进入农场失败，无法执行遣返")
+            }
+        } catch (t: Throwable) {
+            Log.printStackTrace(TAG, "manualSendBackAnimal 异常:", t)
+        }
+    }
+    /**
+     * 手动执行庄园游戏改分逻辑（供 ManualTask 调用）
+     */
+    suspend fun manualFarmGameLogic() {
+        try {
+            Log.record(TAG, "开始执行手动游戏改分任务...")
+            if (enterFarm() != null) {
+                // 同步最新状态后执行原有逻辑
+                syncAnimalStatus(ownerFarmId)
+                val foodStockThreshold = foodStockLimit - gameRewardMax!!.value
+                if (foodStock < foodStockThreshold) {
+                    receiveFarmAwards()
+                }
+                playAllFarmGames()
+                Log.record(TAG, "手动游戏改分任务处理完毕")
+            }
+        } catch (t: Throwable) {
+            Log.printStackTrace(TAG, "manualFarmGameLogic err:", t)
+        }
+    }
+    /**
+     * 手动执行庄园抽抽乐逻辑（供 ManualTask 调用）
+     */
+    fun manualChouChouLeLogic() {
+        try {
+            Log.record(TAG, "🚀 开始执行手动抽抽乐任务...")
+            if (enterFarm() != null) {
+                playChouChouLe()
+                Log.record(TAG, "✅ 手动抽抽乐任务处理完毕")
+            }
+        } catch (t: Throwable) {
+            Log.printStackTrace(TAG, "manualChouChouLeLogic 异常:", t)
+        }
+    }
+    /**
+     * 手动使用特殊美食
+     * @param count 期望使用的总数量（必须 > 0）
+     */
+    fun manualUseSpecialFood(count: Int) {
+        try {
+            // 1. 严格校验：如果数量 <= 0，则不执行任何逻辑
+            if (count <= 0) {
+                Log.record(TAG, "⚠️ 手动使用特殊美食已拦截：必须指定大于0的使用次数")
+                return
+            }
+
+            Log.record(TAG, "🚀 开始执行手动使用特殊美食任务，目标数量: $count")
+            val jo = enterFarm()
+            if (jo != null) {
+                val cuisineList = jo.getJSONArray("cuisineList")
+
+                if (AnimalFeedStatus.SLEEPY.name == ownerAnimal.animalFeedStatus) {
+                    Log.record(TAG, "❌ 小鸡正在睡觉，无法使用美食")
+                } else {
+                    useSpecialFood(cuisineList, count)
+                    Log.record(TAG, "✅ 手动使用特殊美食任务处理完毕")
+                }
+            } else {
+                Log.record(TAG, "❌ 进入农场失败，无法执行任务")
+            }
+        } catch (t: Throwable) {
+            Log.printStackTrace(TAG, "manualUseSpecialFood 异常:", t)
+        }
+    }
+
+    /**
+     * 手动使用庄园道具
+     * @param toolType 道具类型：BIG_EATER_TOOL, NEWEGGTOOL, FENCETOOL
+     * @param toolCount 使用数量（仅 NEWEGGTOOL 有效）
+     */
+    fun manualUseFarmTool(toolType: String, toolCount: Int) {
+        try {
+            if (enterFarm() != null) {
+                syncAnimalStatus(ownerFarmId)
+                Log.record(TAG, "开始执行手动使用道具: $toolType, 计划数量: $toolCount")
+                val farmTools = listFarmTool()
+                if (farmTools == null || farmTools.isEmpty()) {
+                    Log.record(TAG, "❌ 获取道具列表失败或道具库为空")
+                    return
+                }
+
+                val tool = farmTools.find { it.toolType?.name == toolType }
+                if (tool == null) {
+                    Log.record(TAG, "❌ 道具库中没有道具: $toolType")
+                    return
+                }
+                if (toolType == "FENCETOOL" && hasFence) {
+                    Log.record(TAG, "❌ 手动执行拦截：篱笆卡效果正在生效中")
+                    return
+                }
+
+                Log.record(TAG, "当前道具 [${tool.toolType?.nickName()}] 余量: ${tool.toolCount}")
+
+                val actualCount = if (toolType == "NEWEGGTOOL") {
+                    if (tool.toolCount < toolCount) {
+                        Log.record(TAG, "⚠️ 道具余量不足，将用完剩余的 ${tool.toolCount} 个")
+                        tool.toolCount
+                    } else {
+                        toolCount
+                    }
+                } else {
+                    1 // 其他道具默认使用1次
+                }
+
+                if (actualCount <= 0) {
+                    Log.record(TAG, "❌ 可用数量为0，终止操作")
+                    return
+                }
+
+                repeat(actualCount) { index ->
+                    val res = AntFarmRpcCall.useFarmTool(ownerFarmId, tool.toolId, tool.toolType?.name)
+                    val jo = JSONObject(res)
+                    if (ResChecker.checkRes(TAG, jo)) {
+                        Log.farm("手动使用道具 [${tool.toolType?.nickName()}] 成功 (${index + 1}/$actualCount)")
+                    } else {
+                        val msg = jo.optString("memo", "未知错误")
+                        Log.record(TAG, "❌ 使用道具失败: $msg")
+                        return@repeat
+                    }
+                    // 使用多个时稍微延迟，避免过快
+                    if (actualCount > 1) Thread.sleep(1000)
+                }
+            }
+        } catch (t: Throwable) {
+            Log.record(TAG, "❌ manualUseFarmTool 出错: ${t.message}")
+            Log.printStackTrace(t)
+        }
     }
 }

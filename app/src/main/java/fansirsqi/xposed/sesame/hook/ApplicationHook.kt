@@ -56,6 +56,10 @@ import fansirsqi.xposed.sesame.task.MainTask
 import fansirsqi.xposed.sesame.task.MainTask.Companion.newInstance
 import fansirsqi.xposed.sesame.task.ModelTask.Companion.stopAllTask
 import fansirsqi.xposed.sesame.task.TaskRunnerAdapter
+import fansirsqi.xposed.sesame.task.manualtask.FarmSubTask
+import fansirsqi.xposed.sesame.task.manualtask.ManualTask
+import fansirsqi.xposed.sesame.task.manualtask.ManualTaskModel
+import fansirsqi.xposed.sesame.util.*
 import fansirsqi.xposed.sesame.util.AssetUtil.checkerDestFile
 import fansirsqi.xposed.sesame.util.AssetUtil.copyStorageSoFileToPrivateDir
 import fansirsqi.xposed.sesame.util.AssetUtil.dexkitDestFile
@@ -99,6 +103,7 @@ class ApplicationHook {
         const val RE_LOGIN: String = "com.eg.android.AlipayGphone.sesame.reLogin"
         const val STATUS: String = "com.eg.android.AlipayGphone.sesame.status"
         const val RPC_TEST: String = "com.eg.android.AlipayGphone.sesame.rpctest"
+        const val MANUAL_TASK: String = "com.eg.android.AlipayGphone.sesame.manual_task"
     }
 
     private object AlipayClasses {
@@ -380,6 +385,38 @@ class ApplicationHook {
                 BroadcastActions.RESTART -> execute({ initHandler() })
                 BroadcastActions.RE_LOGIN -> reOpenApp()
                 BroadcastActions.RPC_TEST -> handleRpcTest(intent)
+                BroadcastActions.MANUAL_TASK -> {
+                    record(TAG, "🚀 收到手动庄园任务指令")
+                    execute {
+                        val taskName = intent.getStringExtra("task")
+                        if (taskName != null) {
+                            val normalizedTaskName = taskName.replace("+", "_")
+                            try {
+                                val task = FarmSubTask.valueOf(normalizedTaskName)
+                                val extraParams = HashMap<String, Any>()
+                                if (task == FarmSubTask.FOREST_WHACK_MOLE) {
+                                    extraParams["whackMoleMode"] = intent.getIntExtra("whackMoleMode", 1)
+                                    extraParams["whackMoleGames"] = intent.getIntExtra("whackMoleGames", 5)
+                                } else if (task == FarmSubTask.FARM_SPECIAL_FOOD) {
+                                    extraParams["specialFoodCount"] = intent.getIntExtra("specialFoodCount", 0)
+                                } else if (task == FarmSubTask.FARM_USE_TOOL) {
+                                    extraParams["toolType"] = intent.getStringExtra("toolType") ?: ""
+                                    extraParams["toolCount"] = intent.getIntExtra("toolCount", 1)
+                                }
+                                ManualTask.runSingle(task, extraParams)
+                            } catch (e: Exception) {
+                                record(TAG, "❌ 无效的任务指令: $taskName")
+                            }
+                        } else {
+                            for (model in Model.modelArray) {
+                                if (model is ManualTaskModel) {
+                                    model.startTask(true, 1)
+                                    break
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -475,7 +512,7 @@ class ApplicationHook {
         private var rpcVersion: RpcVersion? = null
 
         @Volatile
-        private var lastExecTime: Long = 0
+        var lastExecTime: Long = 0
 
         @Volatile
         var nextExecutionTime: Long = 0
@@ -517,7 +554,6 @@ class ApplicationHook {
 
                     lastExecTime = currentTime
                     TaskRunnerAdapter().run()
-                    scheduleNextExecutionInternal(lastExecTime)
                 }
             } catch (e: IllegalStateException) {
                 record(TAG, "⚠️ " + e.message)
@@ -543,29 +579,19 @@ class ApplicationHook {
             }
         }
 
-        // --- 调度与执行 ---
-        @JvmStatic
-        fun scheduleNextExecution() {
-            scheduleNextExecutionInternal(lastExecTime)
-        }
 
-        private fun scheduleNextExecutionInternal(lastTime: Long) {
+
+        fun scheduleNextExecutionInternal(lastTime: Long) {
             try {
                 checkInactiveTime()
                 val checkInterval = checkInterval.value
                 val execAtTimeList = execAtTimeList.value
-
                 if (execAtTimeList != null && execAtTimeList.contains("-1")) {
                     record(TAG, "定时执行未开启")
                     return
                 }
-
                 var delayMillis = checkInterval.toLong()
                 var targetTime: Long = 0
-
-                // ... (计算 delayMillis 逻辑保持不变) ...
-
-                // 计算逻辑简化省略，保持原逻辑
                 if (execAtTimeList != null) {
                     val lastCal = TimeUtil.getCalendarByTimeMillis(lastTime)
                     val nextCal = TimeUtil.getCalendarByTimeMillis(lastTime + checkInterval)
@@ -579,10 +605,8 @@ class ApplicationHook {
                         }
                     }
                 }
-
                 nextExecutionTime = if (targetTime > 0) targetTime else (lastTime + delayMillis)
                 ensureScheduler()
-
                 schedule(delayMillis, "轮询任务") {
                     execHandler()
                 }
@@ -832,6 +856,7 @@ class ApplicationHook {
                 filter.addAction(BroadcastActions.RE_LOGIN)
                 filter.addAction(BroadcastActions.STATUS)
                 filter.addAction(BroadcastActions.RPC_TEST)
+                filter.addAction(BroadcastActions.MANUAL_TASK)
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     context.registerReceiver(mBroadcastReceiver, filter, Context.RECEIVER_EXPORTED)
