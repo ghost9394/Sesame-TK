@@ -487,7 +487,7 @@ class ApplicationHook {
             }
             // 例如：10.6.58.8000 <= 10.6.58.99999，但 10.6.59 > 10.6.58.99999
             record(TAG, "目标应用版本 $alipayVersion 高于 10.6.58，不支持自动过滑块验证")
-            return alipayVersion <= AlipayVersion("10.6.58.99999")
+            return alipayVersion <= AlipayVersion("11.6.58.99999")
 
         }
 
