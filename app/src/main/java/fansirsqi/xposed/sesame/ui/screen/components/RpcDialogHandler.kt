@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -62,7 +63,9 @@ fun RpcDialogHandler(state: RpcDialogState, viewModel: RpcDebugViewModel) {
                 properties = DialogProperties(usePlatformDefaultWidth = false)
             ) {
                 Surface(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
                     shape = MaterialTheme.shapes.large,
                     color = MaterialTheme.colorScheme.surface,
                     tonalElevation = 4.dp
@@ -108,14 +111,16 @@ fun RpcDialogHandler(state: RpcDialogState, viewModel: RpcDebugViewModel) {
                                         } else {
                                             ""
                                         }
-                                    } catch (e: Exception) { "" }
+                                    } catch (e: Exception) {
+                                        ""
+                                    }
 
                                     ToastUtil.makeText(context, "已导入剪贴板数据", 0).show()
                                 }
                             ) {
-                                Icon(Icons.Default.AutoFixHigh, null, modifier = Modifier.size(18.dp)) // 换个图标，或者用 ContentPaste
+                                Icon(Icons.Default.ImportExport, null, modifier = Modifier.size(18.dp)) // 换个图标，或者用 ContentPaste
                                 Spacer(Modifier.width(4.dp))
-                                Text("导入剪贴板")
+                                Text("从剪贴板导入")
                             }
                         }
 
