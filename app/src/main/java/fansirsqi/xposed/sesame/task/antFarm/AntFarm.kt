@@ -232,6 +232,8 @@ class AntFarm : ModelTask() {
     private lateinit var remainingTime: IntegerModelField
     private var enableChouchoule: BooleanModelField? = null
     private var enableChouchouleTime: StringModelField? = null // 抽抽乐执行时间
+    var autoExchange: BooleanModelField? = null
+    var doChouChouLeDonationTask: BooleanModelField? = null
     private var listOrnaments: BooleanModelField? = null
     private var hireAnimal: BooleanModelField? = null
     private var hireAnimalType: ChoiceModelField? = null
@@ -325,6 +327,12 @@ class AntFarm : ModelTask() {
                 "开启小鸡抽抽乐",
                 false
             ).also { enableChouchoule = it })
+        modelFields.addField(
+            BooleanModelField(
+                "autoExchange",
+                "IP抽抽乐自动从高到低兑换物品",
+                false
+            ).also { autoExchange = it })
         modelFields.addField(
             StringModelField(
                 "enableChouchouleTime",
@@ -596,6 +604,12 @@ class AntFarm : ModelTask() {
                 "使用SmartSchedulerManager定时蹲点任务",
                 false
             ).also { useSmartSchedulerManager = it })
+        modelFields.addField(
+            BooleanModelField(
+                "doChouChouLeDonationTask",
+                "抽抽乐捐赠任务(禁止开启)",
+                false
+            ).also { doChouChouLeDonationTask = it })
         return modelFields
     }
 
@@ -1009,7 +1023,11 @@ class AntFarm : ModelTask() {
                     ChildModelTask(
                         sleepTaskId,
                         "AS",
-                        suspendRunnable = { this.animalSleepNow() },
+                        suspendRunnable = {
+                            this.animalSleepNow()
+                            syncAnimalStatus(ownerFarmId)
+                            receiveFarmAwards()
+                        },
                         animalSleepTime
                     )
                 )
