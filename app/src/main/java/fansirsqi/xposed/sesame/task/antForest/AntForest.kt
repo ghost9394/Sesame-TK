@@ -698,8 +698,6 @@ class AntForest : ModelTask(), EnergyCollectCallback {
         tryCountInt = tryCount!!.value
         retryIntervalInt = retryInterval!!.value
         advanceTime!!.value
-
-
         jsonCollectMap = dontCollectList!!.value
 
         // 创建收取间隔实体
@@ -781,8 +779,6 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                 obj
             }
 
-
-
             // 然后执行传统的好友排行榜收取（协程）
             Log.record(TAG, "🚀 执行好友能量收取（协程）")
             collectFriendEnergyCoroutine() // 内部会自动调用 usePropBeforeCollectEnergy(userId, false)
@@ -818,6 +814,9 @@ class AntForest : ModelTask(), EnergyCollectCallback {
 
                 handleUserProps(selfHomeObj)
                 tc.countDebug("收取动物派遣能量")
+
+                collectEnergyBomb(selfHomeObj)
+                tc.countDebug("收取炸弹卡能量")
 
                 if (canConsumeAnimalProp && consumeAnimalProp!!.value) {
                     queryAndConsumeAnimal()
@@ -1206,6 +1205,68 @@ class AntForest : ModelTask(), EnergyCollectCallback {
             Log.printStackTrace(e)
         } catch (e: Exception) {
             Log.printStackTrace(TAG, "handleUserProps err",e)
+        }
+    }
+
+    /**
+     * 收取能量炸弹卡炸落的能量
+     * 基于抓包数据：alipay.antforest.forest.h5.collectBombCardEnergy
+     *
+     * @param selfHomeObj 用户主页信息的JSON对象
+     */
+    private fun collectEnergyBomb(selfHomeObj: JSONObject) {
+        try {
+            val usingUserProps = if (isTeam(selfHomeObj)) {
+                selfHomeObj.optJSONObject("teamHomeResult")
+                    ?.optJSONObject("mainMember")
+                    ?.optJSONArray("usingUserProps")
+                    ?: JSONArray()
+            } else {
+                selfHomeObj.optJSONArray("usingUserPropsNew") ?: JSONArray()
+            }
+
+            if (usingUserProps.length() == 0) return
+
+            for (i in 0..<usingUserProps.length()) {
+                val jo = usingUserProps.getJSONObject(i)
+                // 筛选能量炸弹卡
+                if ("energyBombCard" != jo.getString("propGroup")) {
+                    continue
+                }
+
+                // 检查是否有可收取的剩余能量
+                val extInfoStr = jo.optString("extInfo")
+                if (extInfoStr.isEmpty()) continue
+
+                val extInfo = JSONObject(extInfoStr)
+                val remainEnergy = extInfo.optInt("remainEnergy", 0)
+
+                if (remainEnergy > 0) {
+                    val propId = jo.getString("propId")
+                    val propName = jo.getString("propName")
+
+                    Log.record(TAG, "发现[$propName]有 $remainEnergy g能量待收取，尝试收取...")
+
+                    // 调用 AntForestRpcCall 中的静态方法
+                    val response = AntForestRpcCall.collectBombCardEnergy(propId)
+
+                    val responseObj = JSONObject(response)
+                    if (ResChecker.checkRes(TAG + "收取炸弹卡能量失败:", responseObj)) {
+                        val collected = responseObj.optInt("collectEnergy", 0)
+                        totalCollected += collected
+                        val str = "收取炸弹卡能量💥[$collected g]"
+                        Toast.show(str)
+                        Log.forest(str)
+
+                        // 收取成功后更新主页数据，避免重复显示
+                        updateSelfHomePage()
+                    } else {
+                        Log.record(TAG, "收取炸弹卡失败: " + responseObj.getString("resultDesc"))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.printStackTrace(TAG, "collectEnergyBomb err", e)
         }
     }
 
@@ -3227,15 +3288,6 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                 )
             )
         }
-        /*
-        // 详细调试信息（可选）
-        Log.runtime(
-            TAG, String.format(
-                "[保护罩] 详细对比: %dms ≤ %dms = %s",
-                remain, thresholdMs, needRenew
-            )
-        )
-        */
         return needRenew
     }
 
@@ -3296,18 +3348,6 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                 )
             )
         }
-
-        /*
-        // 详细调试信息
-        Log.runtime(
-            TAG, String.format(
-                "[炸弹卡] 详细对比: 剩余时间=%dms ≤ 阈值=%dms = %s, 续写后时长=%dms ≤ 最大时长=%dms = %s",
-                remain, bombRenewThreshold, (remain <= bombRenewThreshold),
-                afterRenewRemain, maxBombDuration, (afterRenewRemain <= maxBombDuration)
-            )
-        )
-        */
-
         return needRenew
     }
 
@@ -4601,9 +4641,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
         @JvmField
         var instance: AntForest? = null
 
-
         private val offsetTimeMath = Average(5)
-
 
         // 保持向后兼容
         /** 保护罩续写阈值（HHmm），例如 2359 表示 23小时59分  */
@@ -4754,8 +4792,6 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                 message = "无法查询用户能量信息"
             )
 
-            //  Log.record(TAG, "蹲点收取查询结果: $queryResult")
-
             // 提取可收取的能量球ID
             val availableBubbles: MutableList<Long> = ArrayList()
             val queryServerTime = queryResult.optLong("now", System.currentTimeMillis())
@@ -4889,6 +4925,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
             Log.printStackTrace(TAG, t)
         }
     }
+
     /**
      * 手动运行能量雨逻辑
      * @param exchange 是否先尝试兑换并使用能量雨卡
