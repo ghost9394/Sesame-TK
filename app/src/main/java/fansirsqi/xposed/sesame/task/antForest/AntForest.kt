@@ -166,6 +166,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
     private var energyRainTime: StringModelField? = null // 能量雨执行时间
     /** 6秒拼手速游戏局数配置 */
     var whackMoleGames: IntegerModelField? = null
+    var whackMoleMoleCount: IntegerModelField? = null
     var whackMoleTime: StringModelField? = null // 6秒拼手速执行时间
 
     // 6秒拼手速模式选择
@@ -292,6 +293,13 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                 "🎮 6秒拼手速 | 激进模式局数",
                 5,
             ).also { whackMoleGames = it })
+
+        modelFields.addField(
+            IntegerModelField(
+                "whackMoleMoleCount",
+                "🎮 6秒拼手速 | 兼容模式击打数",
+                15,
+            ).also { whackMoleMoleCount = it })
 
         modelFields.addField(
             StringModelField(
@@ -1456,6 +1464,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                     1 -> { // 兼容模式
                         Log.record(TAG, "🎮 触发拼手速任务: 兼容模式")
                         WhackMole.setTotalGames(1)
+                        WhackMole.setMoleCount(whackMoleMoleCount?.value ?: 15)
                         WhackMole.start(WhackMole.Mode.COMPATIBLE)
                     }
                     2 -> { // 激进模式
@@ -2745,7 +2754,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                         if (!extInfo.isEmpty()) {
                             val extInfoObj = JSONObject(extInfo)
                             val leftEnergy = extInfoObj.optString("leftEnergy", "0").toDouble()
-                            if (leftEnergy > 3000 || ("true" == extInfoObj.optString(
+                            if (leftEnergy > 20000 || ("true" == extInfoObj.optString(
                                     "overLimitToday",
                                     "false"
                                 ) && leftEnergy >= 1)
@@ -4910,6 +4919,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
 
                 // 设置本次执行的总局数
                 WhackMole.setTotalGames(games)
+                WhackMole.setMoleCount(whackMoleMoleCount?.value ?: 15)
 
                 Log.record(
                     TAG,
