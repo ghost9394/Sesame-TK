@@ -11,9 +11,10 @@ import fansirsqi.xposed.sesame.entity.OtherEntityProvider.listEcoLifeOptions
 import fansirsqi.xposed.sesame.entity.OtherEntityProvider.listHealthcareOptions
 import fansirsqi.xposed.sesame.entity.VitalityStore
 import fansirsqi.xposed.sesame.entity.VitalityStore.Companion.getNameById
-import fansirsqi.xposed.sesame.hook.ApplicationHook
+import fansirsqi.xposed.sesame.util.GameTask
 import fansirsqi.xposed.sesame.hook.RequestManager.requestString
 import fansirsqi.xposed.sesame.hook.Toast
+import fansirsqi.xposed.sesame.hook.internal.AlipayMiniMarkHelper
 import fansirsqi.xposed.sesame.hook.internal.AuthCodeHelper
 import fansirsqi.xposed.sesame.hook.rpc.intervallimit.FixedOrRangeIntervalLimit
 import fansirsqi.xposed.sesame.hook.rpc.intervallimit.IntervalLimit
@@ -802,6 +803,9 @@ class AntForest : ModelTask(), EnergyCollectCallback {
     override suspend fun runSuspend() {
         val runStartTime = System.currentTimeMillis()
         Log.record(TAG, "🌲🌲🌲 森林主任务开始执行 🌲🌲🌲")
+        val authCode = AuthCodeHelper.getAuthCode("2060170000363691" )
+        val MiniMark = AlipayMiniMarkHelper.getAlipayMiniMark("2060170000363691" ,"1.0.1")
+        Log.record(TAG, "游戏 2060170000363691 获取到的 authCode: $authCode   Mark:$MiniMark")
         try {
             // 每次运行时检查并更新计数器
             checkAndUpdateCounters()
@@ -983,6 +987,9 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                     chouChouLe.chouChouLe()
                     tc.countDebug("抽抽乐")
                 }
+
+                doforestgame()
+
 
                 tc.stop()
             }
@@ -2859,7 +2866,7 @@ class AntForest : ModelTask(), EnergyCollectCallback {
             for (i in 0..<usingUserProps.length()) {
                 val userUsingProp = usingUserProps.getJSONObject(i)
                 val propGroup = userUsingProp.getString("propGroup")
-                val propName = userUsingProp.getString("propName")
+                val propName = userUsingProp.optString("propName")
                 when (propGroup) {
                     "doubleClick" -> {
                         doubleEndTime = userUsingProp.getLong("endTime")
@@ -2898,6 +2905,9 @@ class AntForest : ModelTask(), EnergyCollectCallback {
                                 }
                             }
                         }
+                    }
+                    else -> {
+                         Log.record(TAG, "跳过非目标道具:$userUsingProp")
                     }
                 }
             }
@@ -4589,6 +4599,92 @@ class AntForest : ModelTask(), EnergyCollectCallback {
         }
     }
 
+
+    fun doforestgame() {
+        try {
+            val response = AntForestRpcCall.queryGameList()
+            val jo = JSONObject(response)
+
+            // 验证请求是否成功
+            if (!ResChecker.checkRes(TAG, jo)) {
+                Log.error(TAG, "queryGameList 失败: ${jo.optString("desc")}")
+                return
+            }
+
+            val drawRights = jo.optJSONObject("gameCenterDrawRights")
+            if (drawRights != null) {
+                val perTime = drawRights.optInt("quotaPerTime", 100)
+
+                // 换算实际宝箱次数
+                val canUseCount = drawRights.optInt("quotaCanUse") / perTime
+                val limitCount = drawRights.optInt("quotaLimit") / perTime
+                val usedCount = drawRights.optInt("usedQuota") / perTime
+
+                //Log.record(TAG, "游戏中心状态: 待开 $canUseCount 个, 已得 $usedCount/$limitCount")
+
+                // 1. 处理待开启奖励 (批量开启)
+                if (canUseCount > 0) {
+                    Log.record(TAG, "正在一次性开启 $canUseCount 个宝箱...")
+                    val drawResStr = AntForestRpcCall.drawGameCenterAward(canUseCount)
+                    if(!ResChecker.checkRes(TAG, drawResStr)){
+                        //Log.error(TAG,"开启宝箱失败 Res:$drawResStr")
+                        return
+                    }
+                    val drawJo = JSONObject(drawResStr)
+                    val resData = drawJo.optJSONObject("resData") ?: drawJo
+                    if (resData.optString("desc") == "success") {
+                        val awardList = resData.optJSONArray("gameCenterDrawAwardList")
+
+                        var totalEnergy = 0
+                        val otherAwards = mutableListOf<String>()
+
+                        if (awardList != null) {
+                            for (i in 0 until awardList.length()) {
+                                val award = awardList.getJSONObject(i)
+                                val type = award.optString("awardType")
+                                val name = award.optString("awardName")
+                                val count = award.optInt("awardCount")
+
+                                if (type == "ENERGY") {
+                                    totalEnergy += count
+                                } else {
+                                    otherAwards.add("${name}x${count}")
+                                }
+                            }
+                        }
+
+                        // 输出统计结果
+                        val logMsg = StringBuilder("[开宝箱] ")
+                        if (totalEnergy > 0) logMsg.append("获得能量: ${totalEnergy}g")
+                        if (otherAwards.isNotEmpty()) {
+                            if (totalEnergy > 0) logMsg.append(", ")
+                            logMsg.append("其他: ${otherAwards.joinToString("/")}")
+                        }
+                        Log.forest(logMsg.toString())
+                    } else {
+                        //Log.error(TAG, "领奖请求失败: $drawResStr")
+                    }
+                }
+
+                // 2. 判断是否需要刷任务 (接你之前的逻辑)
+                val remainToTask = limitCount - usedCount
+                if (remainToTask > 0) {
+
+                        //Log.record(TAG, "任务进度未满，准备执行 $remainToTask 次上报...")
+                GameTask.Forest_slxcc.report(remainToTask)
+
+
+                } else {
+                   // Log.record(TAG, "今日游戏中心任务已满额")
+                }
+            }
+
+        } catch (e: CancellationException) {
+            throw e
+        } catch (t: Throwable) {
+            Log.printStackTrace(TAG, "doforestgame 流程异常", t)
+        }
+    }
     /**
      * 收取状态的枚举类型
      */
