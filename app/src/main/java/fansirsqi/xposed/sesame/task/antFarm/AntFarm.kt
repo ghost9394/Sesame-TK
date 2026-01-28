@@ -3756,40 +3756,38 @@ class AntFarm : ModelTask() {
             val targetConfig = NpcConfig.getByIndex(selectedIndex)
             if (targetConfig == NpcConfig.NONE) return
 
-            // 1. 查找当前已雇佣的NPC动物
-            var currentNpcAnimal: Animal? = null
-            var currentNpcJson: JSONObject? = null // 用于获取 Animal 类未映射的字段
-
-            // 为了获取准确的 npcBizReward 等字段，建议解析 syncAnimalStatus 的原始响应
-            // 这里我们先从 enterFarm 缓存的 animals 中找，如果找不到或需要精确状态，可能需要重新 sync
-            if (animals != null) {
-                for (animal in animals!!) {
-                    if ("NPC" == animal.subAnimalType) {
-                        currentNpcAnimal = animal
-                        break
-                    }
-                }
-            }
-
-            // 如果内存中状态可能不准，或者需要详细字段，重新同步一次
+            // 1. 同步最新状态以获取准确的 NPC 信息
             val syncRes = AntFarmRpcCall.syncAnimalStatus(ownerFarmId, "SYNC_NPC", "QUERY_FARM_INFO")
             val joSync = JSONObject(syncRes)
-            if (!ResChecker.checkRes(TAG, joSync)) return
+            if (ResChecker.checkRes(TAG, joSync)) {
+                // 更新全局 animals 列表和 ownerAnimal
+                parseSyncAnimalStatusResponse(joSync)
+            } else {
+                return
+            }
 
-            val animalsJa = joSync.optJSONObject("subFarmVO")?.optJSONArray("animals")
-            if (animalsJa != null) {
+            // 2. 从更新后的全局列表中查找 NPC 小鸡
+            var currentNpcAnimal: Animal? = null
+            var currentNpcJson: JSONObject? = null
+
+            // 需要重新获取 json 用于读取 npcBizReward 等字段，因为 Animal 类可能未映射这些字段
+            val subFarmVO = joSync.optJSONObject("subFarmVO")
+            val animalsJa = subFarmVO?.optJSONArray("animals")
+
+            if (animalsJa != null && animals != null) {
                 for (i in 0 until animalsJa.length()) {
                     val a = animalsJa.getJSONObject(i)
                     if ("NPC" == a.optString("subAnimalType")) {
                         currentNpcJson = a
-                        // 更新内存对象
-                        currentNpcAnimal = objectMapper.readValue(a.toString(), Animal::class.java)
+                        // 在全局 animals 列表中找到对应的对象
+                        val id = a.optString("animalId")
+                        currentNpcAnimal = animals?.find { it.animalId == id }
                         break
                     }
                 }
             }
 
-            // 2. 决策逻辑
+            // 3. 决策逻辑
             if (currentNpcAnimal == null) {
                 // 场景A: 当前没有NPC -> 直接雇佣目标NPC
                 Log.record(TAG, "NPC小鸡🤖[当前未雇佣，准备雇佣${targetConfig.nickName}]")
@@ -3797,16 +3795,16 @@ class AntFarm : ModelTask() {
             } else {
                 // 场景B: 当前有NPC
                 val currentId = currentNpcAnimal.animalId
-
+                // 注意：这里比较 ID 需要确保 targetConfig.animalId 是准确的静态配置
                 if (currentId == targetConfig.animalId) {
-                    // B1: 正是选中的这只 -> 检查奖励是否已满
+                    // B1: 正是选中的这只 -> 检查奖励是否已满及任务
                     checkRewardAndTask(currentNpcAnimal, currentNpcJson, targetConfig)
                 } else {
                     // B2: 是其他类型的NPC -> 遣返旧的，雇佣新的
                     val currentName = currentNpcAnimal.masterUserInfoVO?.get("nickName") as? String ?: "未知NPC"
                     Log.record(TAG, "NPC小鸡🤖[检测到${currentName}，目标是${targetConfig.nickName}，执行切换]")
 
-                    // 遣返当前 (领取奖励)
+                    // 遣返当前
                     val sendBackRes = AntFarmRpcCall.sendBackNpcAnimal(
                         currentNpcAnimal.animalId,
                         currentNpcAnimal.currentFarmId,
@@ -3814,7 +3812,7 @@ class AntFarm : ModelTask() {
                     )
                     if (ResChecker.checkRes(TAG, JSONObject(sendBackRes))) {
                         Log.farm("NPC小鸡🤖[已遣返${currentName}]")
-                        delay(1000)
+                        delay(1500)
                         // 雇佣新的
                         hireNpc(targetConfig)
                     } else {
@@ -3822,7 +3820,6 @@ class AntFarm : ModelTask() {
                     }
                 }
             }
-
         } catch (t: Throwable) {
             Log.printStackTrace(TAG, "handleNpcAnimalLogic err:", t)
         }
@@ -3846,13 +3843,18 @@ class AntFarm : ModelTask() {
     }
 
     private suspend fun checkRewardAndTask(animal: Animal, animalJson: JSONObject?, config: NpcConfig) {
-        // 1. 检查奖励是否达标
-        val currentReward = animalJson?.optDouble("npcBizReward", 0.0) ?: 0.0
-        // 部分NPC可能用 reachNpcBizRewardLimit 标识满额，部分可能用阈值
-        // 芝麻粒通常是 88，其他可能是 100%
-        val isLimit = animalJson?.optBoolean("reachNpcBizRewardLimit", false) ?: false
+        // 1. 优先处理加速任务/领取任务奖励 (防止满产遣返后漏领任务)
+        when (config) {
+            NpcConfig.ZHIMA_PIGEON -> handleZhimaPigeonTasks()
+            NpcConfig.FARM_CHICKEN -> handleFarmChickenTasks()
+            NpcConfig.GOLD_CHICKEN -> handleGoldChickenTasks()
+            else -> {}
+        }
 
-        // 判定满额逻辑：如果是芝麻鸽且>=88，或者是通用Limit标记
+        // 2. 检查产出奖励是否达标
+        val currentReward = animalJson?.optDouble("npcBizReward", 0.0) ?: 0.0
+        val isLimit = animalJson?.optBoolean("reachNpcBizRewardLimit", false) ?: false
+        // 判定满额逻辑：部分NPC有明确标记，芝麻鸽通常是88粒
         val isFull = isLimit || (config == NpcConfig.ZHIMA_PIGEON && currentReward >= 88.0)
 
         if (isFull) {
@@ -3862,20 +3864,18 @@ class AntFarm : ModelTask() {
                 animal.currentFarmId,
                 animal.masterFarmId
             )
-            if (ResChecker.checkRes(TAG, JSONObject(sendBackRes))) {
-                Log.farm("NPC小鸡🤖[奖励领取成功]")
-                delay(1500)
-                hireNpc(config)
+            val joSendBack = JSONObject(sendBackRes)
+            if (ResChecker.checkRes(TAG, joSendBack)) {
+                Log.farm("NPC小鸡🤖[产出奖励领取成功]")
+                delay(2000)
+                if (!hireNpc(config)) {
+                    Log.record(TAG, "NPC小鸡🤖[重雇失败，请检查状态]")
+                }
+            } else {
+                Log.record(TAG, "NPC小鸡🤖[遣返领取奖励失败: ${joSendBack.optString("memo")}]")
             }
         } else {
             Log.record(TAG, "NPC小鸡🤖[${config.nickName}工作中... 当前产出:$currentReward]")
-
-            // 2. 处理各NPC的加速任务
-            when (config) {
-                NpcConfig.ZHIMA_PIGEON -> handleZhimaPigeonTasks()
-                NpcConfig.FARM_CHICKEN -> handleFarmChickenTasks()
-                else -> {}
-            }
         }
     }
 
