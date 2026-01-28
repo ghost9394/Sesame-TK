@@ -3854,8 +3854,10 @@ class AntFarm : ModelTask() {
         // 2. 检查产出奖励是否达标
         val currentReward = animalJson?.optDouble("npcBizReward", 0.0) ?: 0.0
         val isLimit = animalJson?.optBoolean("reachNpcBizRewardLimit", false) ?: false
-        // 判定满额逻辑：部分NPC有明确标记，芝麻鸽通常是88粒
-        val isFull = isLimit || (config == NpcConfig.ZHIMA_PIGEON && currentReward >= 88.0)
+        // 判定满额逻辑：部分NPC有明确标记，芝麻鸽通常是88粒，黄金鸡为2888
+        val isFull = isLimit
+                || (config == NpcConfig.ZHIMA_PIGEON && currentReward >= 88.0)
+                || (config == NpcConfig.GOLD_CHICKEN && currentReward >= 2888.0)
 
         if (isFull) {
             Log.farm("NPC小鸡🤖[${config.nickName}产出已满($currentReward)，领取并重雇]")
@@ -3914,7 +3916,7 @@ class AntFarm : ModelTask() {
      * 处理黄金小鸡的加速任务
      * 对应 RPC: com.alipay.antfarm.listFarmTask (taskSceneCode=ANTFARM_CAIFU_NPC_TASK)
      */
-    private fun handleGoldChickenTasks() {
+    private suspend fun handleGoldChickenTasks() { // 🟢 修改点：增加 suspend 关键字
         try {
             // 注意：需确保 AntFarmRpcCall 中已添加 listGoldChickenFarmTask 方法，参数对应日志中的 requestData
             val s = AntFarmRpcCall.listGoldChickenFarmTask()
@@ -3929,9 +3931,9 @@ class AntFarm : ModelTask() {
                     val bizKey = task.optString("bizKey")
                     val taskMode = task.optString("taskMode")
 
-                    // 1. 领取奖励
+                    // 1. 领取奖励 (修正：使用带 SceneCode 的专用接口)
                     if (TaskStatus.FINISHED.name == taskStatus) {
-                        val awardRes = AntFarmRpcCall.receiveFarmTaskAward(taskId)
+                        val awardRes = AntFarmRpcCall.receiveGoldChickenTaskAward(taskId)
                         val awardJo = JSONObject(awardRes)
                         if (ResChecker.checkRes(TAG, awardJo)) {
                             val awardCount = task.optInt("awardCount", 0)
@@ -3940,11 +3942,29 @@ class AntFarm : ModelTask() {
                     }
                     // 2. 做任务 (仅处理 TRIGGER 类型，如"开始攒黄金"、"领体验金")
                     else if (TaskStatus.TODO.name == taskStatus && taskMode == "TRIGGER") {
-                        val doRes = AntFarmRpcCall.doFarmTask(bizKey)
-                        val doJo = JSONObject(doRes)
-                        if (ResChecker.checkRes(TAG, doJo)) {
-                            Log.farm("NPC任务🤖[触发: $title]")
+                        // 先执行通用的点击任务
+                        AntFarmRpcCall.doFarmTask(bizKey)
+
+                        // 针对特殊任务进行额外模拟
+                        if ("CAIFU_NPC_FUND_TASK" == bizKey) {
+                            // 领20000元体验金：需要模拟进入页面并开启计划
+                            Log.record(TAG, "NPC任务🤖[处理体验金任务: $title]")
+                            // 1. 查询首页
+                            AntFarmRpcCall.lctyj2025PromoIndex()
+                            delay(1000) // 🟢 delay 必须在 suspend 函数中调用
+                            // 2. 尝试开启计划（幂等操作，如果已开过会报错或返回已有计划，不影响流程）
+                            val openRes = AntFarmRpcCall.lctyj2025OpenPlan()
+                            val openJo = JSONObject(openRes)
+                            if (openJo.optBoolean("success")) {
+                                Log.farm("NPC任务🤖[体验金计划开启成功]")
+                            }
+                        } else if ("CAIFU_NPC_SAVE_TASK" == bizKey) {
+                            // 开始攒黄金：仅模拟进入页面，不执行签约/扣款
+                            Log.record(TAG, "NPC任务🤖[浏览攒黄金页面: $title]")
+                            AntFarmRpcCall.queryGoldCollectionV2()
                         }
+
+                        Log.farm("NPC任务🤖[触发: $title]")
                     }
                 }
             }
